@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BankMasker — Sensitive Data Masking for Java</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.min.css">
+    <style>
+        body { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .hero { text-align: center; padding: 3rem 0; }
+        .hero h1 { font-size: 3rem; margin-bottom: 0.5rem; }
+        .hero p { font-size: 1.3rem; color: #aaa; }
+        .badges { text-align: center; margin: 1rem 0 2rem; }
+        .badges img { margin: 0 0.3rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
+        .card { background: #1a1a2e; border-radius: 12px; padding: 1.5rem; border: 1px solid #333; }
+        .card h3 { margin-top: 0; }
+        pre { background: #0d1117; border-radius: 8px; padding: 1rem; overflow-x: auto; }
+        .cta { text-align: center; margin: 3rem 0; }
+        .cta a { display: inline-block; padding: 1rem 2rem; background: #4CAF50; color: white; text-decoration: none; border-radius: 8px; font-size: 1.1rem; margin: 0 0.5rem; }
+        .cta a:hover { background: #45a049; }
+        .cta a.secondary { background: #333; }
+        table { width: 100%; }
+        footer { text-align: center; margin-top: 4rem; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="hero">
+    <h1>🏦 BankMasker</h1>
+    <p>Lightweight Java library for masking sensitive data during JSON serialization</p>
+</div>
+
+<div class="badges">
+    <img src="https://img.shields.io/badge/Java-17+-orange" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Jackson-2.18-blue" alt="Jackson 2.18">
+    <img src="https://img.shields.io/badge/Spring_Boot-3.4-green" alt="Spring Boot 3.4">
+    <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License">
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h3>⚡ Zero Config</h3>
+        <p>Just add <code>@MaskData</code> to your fields. Works instantly with any Jackson ObjectMapper.</p>
+    </div>
+    <div class="card">
+        <h3>🔒 9 Built-in Masks</h3>
+        <p>Credit cards, emails, phones, IBANs, SSNs, names, IDs — all covered out of the box.</p>
+    </div>
+    <div class="card">
+        <h3>🎨 Custom Masking</h3>
+        <p>Configure mask character, visible start/end, or implement your own <code>MaskingStrategy</code>.</p>
+    </div>
+    <div class="card">
+        <h3>🌱 Spring Boot Starter</h3>
+        <p>Auto-configuration via <code>application.yml</code>. Enable/disable masking, audit logging and more.</p>
+    </div>
+    <div class="card">
+        <h3>📝 Audit Trail</h3>
+        <p>Track which fields are masked with built-in SLF4J logger or your custom implementation.</p>
+    </div>
+    <div class="card">
+        <h3>🛠️ MaskUtils</h3>
+        <p>Use masking in <code>toString()</code>, logs, or anywhere — not just JSON serialization.</p>
+    </div>
+</div>
+
+<h2>Quick Start</h2>
+
+<h3>1. Add the dependency</h3>
+<pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;io.github.zeytx&lt;/groupId&gt;
+    &lt;artifactId&gt;bankmasker-core&lt;/artifactId&gt;
+    &lt;version&gt;1.0.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+<p>For Spring Boot projects:</p>
+<pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;io.github.zeytx&lt;/groupId&gt;
+    &lt;artifactId&gt;bankmasker-spring-boot-starter&lt;/artifactId&gt;
+    &lt;version&gt;1.0.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+<h3>2. Annotate your DTOs</h3>
+<pre><code>public class PaymentDTO {
+
+    @MaskData(MaskType.CREDIT_CARD)
+    private String cardNumber;
+
+    @MaskData(MaskType.EMAIL)
+    private String email;
+
+    @MaskData(MaskType.IBAN)
+    private String iban;
+
+    @MaskData(MaskType.NAME)
+    private String fullName;
+}</code></pre>
+
+<h3>3. Output</h3>
+<pre><code>{
+  "cardNumber": "****-****-****-1234",
+  "email": "jo****@example.com",
+  "iban": "ES******************7891",
+  "fullName": "J*** D**"
+}</code></pre>
+
+<h2>Built-in Mask Types</h2>
+<table>
+    <thead>
+        <tr><th>Type</th><th>Input</th><th>Output</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>CREDIT_CARD</code></td><td>4111111111111111</td><td>****-****-****-1111</td></tr>
+        <tr><td><code>EMAIL</code></td><td>john.doe@example.com</td><td>jo****@example.com</td></tr>
+        <tr><td><code>PHONE</code></td><td>+525512345678</td><td>********5678</td></tr>
+        <tr><td><code>DNI</code></td><td>ABCD123456</td><td>******3456</td></tr>
+        <tr><td><code>IBAN</code></td><td>ES6621000418401234567891</td><td>ES******************7891</td></tr>
+        <tr><td><code>SSN</code></td><td>123-45-6789</td><td>***-**-6789</td></tr>
+        <tr><td><code>NAME</code></td><td>John Doe</td><td>J*** D**</td></tr>
+        <tr><td><code>TOTAL</code></td><td>anything</td><td>********</td></tr>
+        <tr><td><code>CUSTOM</code></td><td><em>configurable</em></td><td><em>configurable</em></td></tr>
+    </tbody>
+</table>
+
+<h2>Spring Boot Configuration</h2>
+<pre><code># application.yml
+bankmasker:
+  enabled: true
+  default-mask-char: '*'
+  audit:
+    enabled: true</code></pre>
+
+<h2>Use in toString() & Logs</h2>
+<pre><code>@Override
+public String toString() {
+    return "User{card=" + MaskUtils.mask(cardNumber, MaskType.CREDIT_CARD) + "}";
+    // → User{card=****-****-****-1234}
+}</code></pre>
+
+<div class="cta">
+    <a href="https://github.com/zeytx/bankmasker">⭐ GitHub</a>
+    <a href="https://github.com/zeytx/bankmasker#-quick-start" class="secondary">📖 Documentation</a>
+</div>
+
+<footer>
+    <p>MIT License © 2026 zeytx</p>
+</footer>
+
+</body>
+</html>
+

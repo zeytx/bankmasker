@@ -1,0 +1,270 @@
+# BankMasker — Full API Reference for LLMs
+
+> Lightweight Java 17+ library for masking sensitive data during Jackson JSON serialization — and beyond.
+> Repository: https://github.com/zeytx/bankmasker
+> License: MIT
+
+This document contains the complete API reference and source code for all public classes.
+Use this to generate code that integrates BankMasker correctly.
+
+---
+
+## Installation
+
+Maven (core only):
+```xml
+<dependency>
+    <groupId>io.github.zeytx</groupId>
+    <artifactId>bankmasker-core</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+Maven (Spring Boot — includes core):
+```xml
+<dependency>
+    <groupId>io.github.zeytx</groupId>
+    <artifactId>bankmasker-spring-boot-starter</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+Gradle (core only):
+```groovy
+implementation 'io.github.zeytx:bankmasker-core:1.0.0-SNAPSHOT'
+```
+
+Gradle (Spring Boot):
+```groovy
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.0.0-SNAPSHOT'
+```
+
+---
+
+## Complete Source: MaskData.java (annotation)
+
+```java
+package io.github.zeytx.bankmasker;
+
+import com.fasterxml.jackson.annotation.JacksonAnnotationsInside;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import java.lang.annotation.*;
+
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.RECORD_COMPONENT})
+@JacksonAnnotationsInside
+@JsonSerialize(using = MaskingSerializer.class)
+public @interface MaskData {
+    MaskType value() default MaskType.TOTAL;
+    char maskChar() default '*';
+    int visibleStart() default 0;
+    int visibleEnd() default 0;
+}
+```
+
+## Complete Source: MaskType.java (12 built-in types)
+
+Available enum values and their behavior:
+
+| MaskType | Example Input | Example Output | Rule |
+|----------|--------------|----------------|------|
+| CREDIT_CARD | 4111111111111111 | ****-****-****-1111 | strips non-digits, keeps last 4 |
+| EMAIL | john@example.com | jo****@example.com | keeps first 2 chars + domain |
+| PHONE | +525512345678 | ********5678 | strips non-digits, keeps last 4 |
+| DNI | ABCD123456 | ******3456 | keeps last 4 chars |
+| IBAN | ES6621000418401234567891 | ES******************7891 | keeps country code (2) + last 4 |
+| SSN | 123-45-6789 | ***-**-6789 | strips non-digits, keeps last 4, formatted |
+| NAME | John Doe | J*** D** | keeps first letter of each word |
+| PASSPORT | AB1234567 | AB****567 | keeps first 2 + last 3 |
+| BANK_ACCOUNT | 12345678901234 | **********1234 | strips non-digits, keeps last 4 |
+| IP_ADDRESS | 192.168.1.100 | ***.***.***.100 | keeps last octet, masks others with *** |
+| TOTAL | anything | ******** | replaces entire value |
+| CUSTOM | (configurable) | (configurable) | uses maskChar, visibleStart, visibleEnd |
+
+All built-in types respect `MaskingConfig.getDefaultMaskChar()`.
+
+## Complete Source: MaskUtils.java (programmatic masking)
+
+```java
+package io.github.zeytx.bankmasker;
+
+public final class MaskUtils {
+    // Mask with a built-in type
+    public static String mask(String value, MaskType type);
+
+    // Mask with custom parameters
+    public static String mask(String value, char maskChar, int visibleStart, int visibleEnd);
+}
+```
+
+Usage:
+```java
+MaskUtils.mask("4111111111111111", MaskType.CREDIT_CARD);  // "****-****-****-1111"
+MaskUtils.mask("john@mail.com", MaskType.EMAIL);            // "jo****@mail.com"
+MaskUtils.mask("ABCDEFGHIJK", '#', 2, 3);                   // "AB######IJK"
+```
+
+Returns null for null input, empty string for empty input.
+Returns original value when `MaskingConfig.getInstance().isEnabled()` is false.
+
+## Complete Source: MaskingConfig.java (configuration)
+
+```java
+package io.github.zeytx.bankmasker;
+
+public final class MaskingConfig {
+    // Global singleton
+    public static MaskingConfig getInstance();
+
+    // Create independent instance for per-ObjectMapper use
+    public static MaskingConfig create();
+
+    public boolean isEnabled();                              // default: true
+    public MaskingConfig setEnabled(boolean enabled);
+
+    public char getDefaultMaskChar();                        // default: '*'
+    public MaskingConfig setDefaultMaskChar(char c);
+
+    public MaskingAuditLogger getAuditLogger();              // default: null
+    public MaskingConfig setAuditLogger(MaskingAuditLogger logger);
+
+    public MaskingConfig reset();                            // resets to defaults
+}
+```
+
+## Complete Source: MaskingModule.java (per-ObjectMapper config)
+
+```java
+package io.github.zeytx.bankmasker;
+
+import com.fasterxml.jackson.databind.Module;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class MaskingModule extends Module {
+    public MaskingModule(MaskingConfig config);  // throws IllegalArgumentException if null
+    public MaskingConfig getConfig();
+}
+```
+
+Usage:
+```java
+MaskingConfig tenantConfig = MaskingConfig.create()
+    .setEnabled(true)
+    .setDefaultMaskChar('#');
+
+ObjectMapper mapper = new ObjectMapper();
+mapper.registerModule(new MaskingModule(tenantConfig));
+// This mapper uses '#', other mappers keep using global config '*'
+```
+
+## Complete Source: MaskingStrategy.java (custom strategy interface)
+
+```java
+package io.github.zeytx.bankmasker;
+
+@FunctionalInterface
+public interface MaskingStrategy {
+    String mask(String value);
+}
+```
+
+## Complete Source: MaskingAuditLogger.java
+
+```java
+package io.github.zeytx.bankmasker;
+
+@FunctionalInterface
+public interface MaskingAuditLogger {
+    void onFieldMasked(String fieldName, MaskType maskType);
+}
+```
+
+## Complete Source: Slf4jMaskingAuditLogger.java
+
+```java
+package io.github.zeytx.bankmasker;
+
+public class Slf4jMaskingAuditLogger implements MaskingAuditLogger {
+    // Logs: [BankMasker] Masked field '{fieldName}' using {maskType}
+    public void onFieldMasked(String fieldName, MaskType maskType);
+}
+```
+
+## Spring Boot Auto-Configuration
+
+application.yml:
+```yaml
+bankmasker:
+  enabled: true              # default: true
+  default-mask-char: '*'     # default: *
+  audit:
+    enabled: false           # default: false — set true for SLF4J audit logging
+```
+
+Auto-configures `MaskingConfig` bean and optionally registers `Slf4jMaskingAuditLogger`.
+
+---
+
+## Common Patterns
+
+### DTO with all mask types:
+```java
+public class SensitiveDTO {
+    @MaskData(MaskType.CREDIT_CARD)  private String card;
+    @MaskData(MaskType.EMAIL)        private String email;
+    @MaskData(MaskType.PHONE)        private String phone;
+    @MaskData(MaskType.IBAN)         private String iban;
+    @MaskData(MaskType.SSN)          private String ssn;
+    @MaskData(MaskType.NAME)         private String name;
+    @MaskData(MaskType.DNI)          private String dni;
+    @MaskData(MaskType.PASSPORT)     private String passport;
+    @MaskData(MaskType.BANK_ACCOUNT) private String account;
+    @MaskData(MaskType.IP_ADDRESS)   private String ip;
+    @MaskData                        private String secret;     // TOTAL
+    @MaskData(value = MaskType.CUSTOM, maskChar = '#', visibleStart = 2, visibleEnd = 3)
+    private String custom;
+}
+```
+
+### Java record:
+```java
+public record PaymentRecord(
+    @MaskData(MaskType.CREDIT_CARD) String card,
+    @MaskData(MaskType.EMAIL) String email,
+    String plainField
+) {}
+```
+
+### In toString() / logs:
+```java
+@Override
+public String toString() {
+    return "User{card=" + MaskUtils.mask(card, MaskType.CREDIT_CARD) + "}";
+}
+log.info("Payment for {}", MaskUtils.mask(card, MaskType.CREDIT_CARD));
+```
+
+### Disable masking globally:
+```java
+MaskingConfig.getInstance().setEnabled(false);
+```
+
+### Custom audit:
+```java
+MaskingConfig.getInstance().setAuditLogger((field, type) ->
+    auditService.record(field, type, Instant.now()));
+```
+
+### Imports needed:
+```java
+import io.github.zeytx.bankmasker.MaskData;
+import io.github.zeytx.bankmasker.MaskType;
+import io.github.zeytx.bankmasker.MaskUtils;
+import io.github.zeytx.bankmasker.MaskingConfig;
+import io.github.zeytx.bankmasker.MaskingModule;
+import io.github.zeytx.bankmasker.MaskingStrategy;
+import io.github.zeytx.bankmasker.MaskingAuditLogger;
+import io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger;
+```
+

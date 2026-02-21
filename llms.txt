@@ -1,0 +1,213 @@
+# BankMasker
+
+> Lightweight Java library for masking sensitive data (credit cards, emails, phones, IBANs, etc.) during JSON serialization with Jackson — and beyond.
+
+BankMasker is the simplest way to mask sensitive fields in Java. Just annotate a String field with `@MaskData` and Jackson automatically masks it. No config needed.
+
+## Quick Start
+
+Add dependency (Maven):
+```xml
+<dependency>
+    <groupId>io.github.zeytx</groupId>
+    <artifactId>bankmasker-core</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+Add dependency (Gradle):
+```groovy
+implementation 'io.github.zeytx:bankmasker-core:1.0.0-SNAPSHOT'
+```
+
+Spring Boot (includes core):
+```xml
+<dependency>
+    <groupId>io.github.zeytx</groupId>
+    <artifactId>bankmasker-spring-boot-starter</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+## Core API
+
+### @MaskData annotation
+
+Annotate any String field, method, or record component. Jackson will automatically mask it during serialization.
+
+```java
+import io.github.zeytx.bankmasker.MaskData;
+import io.github.zeytx.bankmasker.MaskType;
+
+public class PaymentDTO {
+    @MaskData(MaskType.CREDIT_CARD)
+    private String cardNumber;        // "4111111111111111" → "****-****-****-1111"
+
+    @MaskData(MaskType.EMAIL)
+    private String email;             // "john@example.com" → "jo****@example.com"
+
+    @MaskData(MaskType.PHONE)
+    private String phone;             // "+525512345678" → "********5678"
+
+    @MaskData(MaskType.IBAN)
+    private String iban;              // "ES6621000418401234567891" → "ES******************7891"
+
+    @MaskData(MaskType.SSN)
+    private String ssn;               // "123-45-6789" → "***-**-6789"
+
+    @MaskData(MaskType.NAME)
+    private String name;              // "John Doe" → "J*** D**"
+
+    @MaskData(MaskType.DNI)
+    private String dni;               // "ABCD123456" → "******3456"
+
+    @MaskData(MaskType.PASSPORT)
+    private String passport;          // "AB1234567" → "AB****567"
+
+    @MaskData(MaskType.BANK_ACCOUNT)
+    private String bankAccount;       // "12345678901234" → "**********1234"
+
+    @MaskData(MaskType.IP_ADDRESS)
+    private String ip;                // "192.168.1.100" → "***.***.***.100"
+
+    @MaskData
+    private String secret;            // defaults to TOTAL: "anything" → "********"
+}
+```
+
+### Custom masking
+
+```java
+@MaskData(value = MaskType.CUSTOM, maskChar = '#', visibleStart = 2, visibleEnd = 3)
+private String accountId;  // "ABCDEFGHIJK" → "AB######IJK"
+```
+
+Parameters: `maskChar` (default '*'), `visibleStart` (default 0), `visibleEnd` (default 0).
+
+### Works with Java records
+
+```java
+public record PaymentRecord(
+    @MaskData(MaskType.CREDIT_CARD) String card,
+    @MaskData(MaskType.EMAIL) String email,
+    String plainField
+) {}
+```
+
+### MaskUtils — programmatic masking (outside Jackson)
+
+```java
+import io.github.zeytx.bankmasker.MaskUtils;
+import io.github.zeytx.bankmasker.MaskType;
+
+// Mask with a built-in type
+String masked = MaskUtils.mask("4111111111111111", MaskType.CREDIT_CARD);
+// → "****-****-****-1111"
+
+// Mask with custom parameters
+String custom = MaskUtils.mask("ABCDEFGHIJK", '#', 2, 3);
+// → "AB######IJK"
+
+// Use in toString()
+@Override
+public String toString() {
+    return "User{card=" + MaskUtils.mask(cardNumber, MaskType.CREDIT_CARD) + "}";
+}
+
+// Use in logs
+log.info("Card: {}", MaskUtils.mask(card, MaskType.CREDIT_CARD));
+```
+
+### MaskingConfig — global configuration
+
+```java
+import io.github.zeytx.bankmasker.MaskingConfig;
+
+MaskingConfig.getInstance()
+    .setEnabled(true)           // enable/disable globally
+    .setDefaultMaskChar('#')    // change mask character for all types
+    .setAuditLogger((field, type) ->
+        log.info("Masked '{}' with {}", field, type));
+```
+
+### MaskingModule — per-ObjectMapper configuration
+
+```java
+import io.github.zeytx.bankmasker.MaskingConfig;
+import io.github.zeytx.bankmasker.MaskingModule;
+
+MaskingConfig tenantConfig = MaskingConfig.create()
+    .setEnabled(true)
+    .setDefaultMaskChar('#');
+
+ObjectMapper mapper = new ObjectMapper();
+mapper.registerModule(new MaskingModule(tenantConfig));
+```
+
+### Audit logging
+
+```java
+import io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger;
+
+MaskingConfig.getInstance()
+    .setAuditLogger(new Slf4jMaskingAuditLogger());
+
+// Or custom
+MaskingConfig.getInstance()
+    .setAuditLogger((field, type) ->
+        auditService.record(field, type, Instant.now()));
+```
+
+### Spring Boot auto-configuration
+
+application.yml:
+```yaml
+bankmasker:
+  enabled: true
+  default-mask-char: '*'
+  audit:
+    enabled: true
+```
+
+### Custom strategy
+
+```java
+import io.github.zeytx.bankmasker.MaskingStrategy;
+
+MaskingStrategy myStrategy = value -> value.charAt(0) + "***";
+```
+
+## Available MaskType values
+
+- `CREDIT_CARD` — keeps last 4 digits, formatted with dashes
+- `EMAIL` — keeps first 2 chars + domain
+- `PHONE` — keeps last 4 digits
+- `DNI` — keeps last 4 characters
+- `IBAN` — keeps country code + last 4
+- `SSN` — keeps last 4 digits, formatted with dashes
+- `NAME` — keeps first letter of each word
+- `PASSPORT` — keeps first 2 + last 3 characters
+- `BANK_ACCOUNT` — keeps last 4 digits
+- `IP_ADDRESS` — keeps last octet
+- `TOTAL` — masks everything (default)
+- `CUSTOM` — configurable via maskChar, visibleStart, visibleEnd
+
+## Key classes
+
+- `io.github.zeytx.bankmasker.MaskData` — annotation
+- `io.github.zeytx.bankmasker.MaskType` — enum with 12 built-in types
+- `io.github.zeytx.bankmasker.MaskUtils` — programmatic masking utility
+- `io.github.zeytx.bankmasker.MaskingConfig` — global/per-mapper configuration
+- `io.github.zeytx.bankmasker.MaskingModule` — Jackson module for per-ObjectMapper config
+- `io.github.zeytx.bankmasker.MaskingStrategy` — functional interface for custom logic
+- `io.github.zeytx.bankmasker.MaskingSerializer` — Jackson serializer (internal)
+- `io.github.zeytx.bankmasker.MaskingAuditLogger` — audit interface
+- `io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger` — SLF4J audit implementation
+
+## Requirements
+
+- Java 17+
+- Jackson 2.18+ (provided scope — you bring your own)
+- Optional: Spring Boot 3.4+ for auto-configuration
+- Optional: SLF4J for audit logging
+
