@@ -7,6 +7,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.4-green)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
 [![CI](https://github.com/zeytx/bankmasker/actions/workflows/ci.yml/badge.svg)](https://github.com/zeytx/bankmasker/actions)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.zeytx/bankmasker-core)](https://central.sonatype.com/artifact/io.github.zeytx/bankmasker-core)
 
 ## ✨ Features
 
@@ -39,14 +40,14 @@
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.1</version>
 </dependency>
 
 <!-- Spring Boot (includes core automatically) -->
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
@@ -54,10 +55,10 @@
 
 ```groovy
 // Core only (any Java project)
-implementation 'io.github.zeytx:bankmasker-core:1.0.0-SNAPSHOT'
+implementation 'io.github.zeytx:bankmasker-core:1.0.1'
 
 // Spring Boot (includes core automatically)
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.0.0-SNAPSHOT'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.0.1'
 ```
 
 ### Annotate your DTO fields
@@ -256,7 +257,7 @@ Run JMH benchmarks to measure serialization overhead:
 
 ```bash
 mvn -pl bankmasker-benchmark package -DskipTests
-java -jar bankmasker-benchmark/target/bankmasker-benchmark-1.0.0-SNAPSHOT.jar
+java -jar bankmasker-benchmark/target/bankmasker-benchmark.jar
 ```
 
 ## 🧪 Running Tests
