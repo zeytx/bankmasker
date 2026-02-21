@@ -32,11 +32,14 @@ jobs:
           echo "Release version: $VERSION"
           mvn versions:set -DnewVersion=$VERSION -DgenerateBackupPoms=false -B
 
-      - name: Build & Verify
+      - name: Build & Test all modules
         run: mvn clean verify -B
 
-      - name: Publish to Maven Central
-        run: mvn deploy -Prelease -DskipTests -B
+      - name: Publish to Maven Central (core + starter only)
+        run: >
+          mvn deploy -Prelease -DskipTests
+          -pl bankmasker-core,bankmasker-spring-boot-starter
+          -am -B
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
@@ -49,4 +52,3 @@ jobs:
           files: |
             bankmasker-core/target/bankmasker-core-*.jar
             bankmasker-spring-boot-starter/target/bankmasker-spring-boot-starter-*.jar
-
