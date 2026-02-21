@@ -16,14 +16,6 @@
     <name>BankMasker Benchmark</name>
     <description>JMH benchmarks for BankMasker serialization performance</description>
 
-    <properties>
-        <!-- Benchmark is internal tooling — do not publish to Maven Central -->
-        <maven.deploy.skip>true</maven.deploy.skip>
-        <maven.install.skip>false</maven.install.skip>
-        <maven.javadoc.skip>true</maven.javadoc.skip>
-        <maven.source.skip>true</maven.source.skip>
-        <gpg.skip>true</gpg.skip>
-    </properties>
 
     <dependencies>
         <dependency>
