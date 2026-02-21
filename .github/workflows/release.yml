@@ -32,11 +32,8 @@ jobs:
           echo "Release version: $VERSION"
           mvn versions:set -DnewVersion=$VERSION -DgenerateBackupPoms=false -B
 
-      - name: Build & Test all modules
-        run: mvn clean verify -B
-
-      - name: Publish to Maven Central
-        run: mvn deploy -Prelease -DskipTests -B
+      - name: Build, Test & Publish to Maven Central
+        run: mvn clean deploy -Prelease -pl !bankmasker-benchmark -B
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
