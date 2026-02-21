@@ -42,3 +42,8 @@ build/
 
 ### Maven ###
 dependency-reduced-pom.xml
+
+### GPG (temp files — NEVER commit these) ###
+*.asc
+gpg-key-params.txt
+
