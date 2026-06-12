@@ -70,12 +70,29 @@ public final class MaskUtils {
      * @return the masked string
      */
     static String applyCustomMask(String value, char maskChar, int visibleStart, int visibleEnd) {
+        return applyCustomMask(value, maskChar, visibleStart, visibleEnd, MaskingConfig.getInstance());
+    }
+
+    /**
+     * Applies a custom mask resolving the default mask character from the given
+     * configuration (per-mapper or global).
+     *
+     * @param value        the value to mask
+     * @param maskChar     the masking character
+     * @param visibleStart visible characters from the start
+     * @param visibleEnd   visible characters from the end
+     * @param config       the resolved masking configuration
+     * @return the masked string
+     * @since 1.1.0
+     */
+    static String applyCustomMask(String value, char maskChar, int visibleStart, int visibleEnd,
+                                  MaskingConfig config) {
         int len = value.length();
         int totalVisible = visibleStart + visibleEnd;
 
-        // If the caller uses the default annotation char '*', respect the global config
+        // If the caller uses the default annotation char '*', respect the config
         char effectiveChar = (maskChar == '*')
-                ? MaskingConfig.getInstance().getDefaultMaskChar()
+                ? config.getDefaultMaskChar()
                 : maskChar;
 
         // Fail-closed: if the visible window covers the whole value, mask everything

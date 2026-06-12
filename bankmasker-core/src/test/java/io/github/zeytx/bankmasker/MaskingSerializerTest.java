@@ -84,6 +84,12 @@ class MaskingSerializerTest {
         public CustomDTO(String accountId) { this.accountId = accountId; }
     }
 
+    static class CustomDefaultCharDTO {
+        @MaskData(value = MaskType.CUSTOM, visibleStart = 2, visibleEnd = 3)
+        public String accountId;
+        public CustomDefaultCharDTO(String accountId) { this.accountId = accountId; }
+    }
+
     static class NullFieldDTO {
         @MaskData(MaskType.CREDIT_CARD)
         public String cardNumber;
@@ -498,6 +504,51 @@ class MaskingSerializerTest {
         @DisplayName("MaskingModule rejects null config")
         void rejectsNullConfig() {
             assertThrows(IllegalArgumentException.class, () -> new MaskingModule(null));
+        }
+
+        @Test
+        @DisplayName("per-mapper defaultMaskChar applies to built-in types")
+        void perMapperMaskCharBuiltIn() throws JsonProcessingException {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.registerModule(new MaskingModule(
+                    MaskingConfig.create().setDefaultMaskChar('#')));
+
+            String json = customMapper.writeValueAsString(new CreditCardDTO("4111111111111111"));
+            assertTrue(json.contains("####-####-####-1111"), "per-mapper maskChar must apply, got: " + json);
+
+            // Global mapper keeps '*'
+            String globalJson = mapper.writeValueAsString(new CreditCardDTO("4111111111111111"));
+            assertTrue(globalJson.contains("****-****-****-1111"));
+        }
+
+        @Test
+        @DisplayName("per-mapper defaultMaskChar applies to TOTAL")
+        void perMapperMaskCharTotal() throws JsonProcessingException {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.registerModule(new MaskingModule(
+                    MaskingConfig.create().setDefaultMaskChar('#')));
+
+            String json = customMapper.writeValueAsString(new TotalDTO("secret"));
+            assertTrue(json.contains("########"), "got: " + json);
+        }
+
+        @Test
+        @DisplayName("per-mapper defaultMaskChar applies to CUSTOM with default char")
+        void perMapperMaskCharCustom() throws JsonProcessingException {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.registerModule(new MaskingModule(
+                    MaskingConfig.create().setDefaultMaskChar('#')));
+
+            String json = customMapper.writeValueAsString(new CustomDefaultCharDTO("ABCDEFGHIJK"));
+            assertTrue(json.contains("AB######IJK"), "got: " + json);
+        }
+
+        @Test
+        @DisplayName("custom MaskingStrategy lambdas keep working (backward compat)")
+        void customStrategyBackwardCompat() {
+            MaskingStrategy custom = v -> "XXX";
+            assertEquals("XXX", custom.mask("secret"));
+            assertEquals("XXX", custom.mask("secret", MaskingConfig.create()));
         }
     }
 }

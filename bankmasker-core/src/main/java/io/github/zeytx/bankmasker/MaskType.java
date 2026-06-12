@@ -30,8 +30,8 @@ public enum MaskType {
      * Masks a credit/debit card number, keeping only the last 4 digits.
      * Input is sanitized (non-digit characters removed) before masking.
      */
-    CREDIT_CARD(value -> {
-        char m = maskChar();
+    CREDIT_CARD((value, config) -> {
+        char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
         if (digits.length() < 4) {
             return repeat(m, 4);
@@ -47,8 +47,8 @@ public enum MaskType {
      * exposing the entire local part. Falls back to total mask if the format
      * is invalid.
      */
-    EMAIL(value -> {
-        char m = maskChar();
+    EMAIL((value, config) -> {
+        char m = config.getDefaultMaskChar();
         int atIndex = value.lastIndexOf('@');
         if (atIndex <= 0) {
             return repeat(m, 8);
@@ -60,8 +60,8 @@ public enum MaskType {
     /**
      * Masks a phone number, keeping only the last 4 digits visible.
      */
-    PHONE(value -> {
-        char m = maskChar();
+    PHONE((value, config) -> {
+        char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
         if (digits.length() < 4) {
             return repeat(m, 4);
@@ -72,8 +72,8 @@ public enum MaskType {
     /**
      * Masks a national ID / DNI, keeping only the last 4 characters.
      */
-    DNI(value -> {
-        char m = maskChar();
+    DNI((value, config) -> {
+        char m = config.getDefaultMaskChar();
         if (value.length() <= 4) {
             return repeat(m, 4);
         }
@@ -84,8 +84,8 @@ public enum MaskType {
      * Masks an IBAN, keeping the country code (first 2 chars) and last 4 digits.
      * Example: {@code ES6621000418401234567891 → ES********************7891}
      */
-    IBAN(value -> {
-        char m = maskChar();
+    IBAN((value, config) -> {
+        char m = config.getDefaultMaskChar();
         String clean = value.replaceAll("\\s", "");
         if (clean.length() <= 6) {
             return repeat(m, 4);
@@ -99,8 +99,8 @@ public enum MaskType {
      * Masks a US Social Security Number, keeping only the last 4 digits.
      * Example: {@code 123-45-6789 → ***-**-6789}
      */
-    SSN(value -> {
-        char m = maskChar();
+    SSN((value, config) -> {
+        char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
         if (digits.length() < 4) {
             return repeat(m, 3) + "-" + repeat(m, 2) + "-" + repeat(m, 4);
@@ -112,8 +112,8 @@ public enum MaskType {
      * Masks a person's name, keeping only the first letter of each word.
      * Example: {@code John Doe → J*** D**}
      */
-    NAME(value -> {
-        char m = maskChar();
+    NAME((value, config) -> {
+        char m = config.getDefaultMaskChar();
         String[] parts = value.split("\\s+");
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
@@ -136,8 +136,8 @@ public enum MaskType {
      *
      * @since 1.1.0
      */
-    PASSPORT(value -> {
-        char m = maskChar();
+    PASSPORT((value, config) -> {
+        char m = config.getDefaultMaskChar();
         if (value.length() <= 5) {
             return repeat(m, 4);
         }
@@ -150,8 +150,8 @@ public enum MaskType {
      *
      * @since 1.1.0
      */
-    BANK_ACCOUNT(value -> {
-        char m = maskChar();
+    BANK_ACCOUNT((value, config) -> {
+        char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
         if (digits.length() <= 4) {
             return repeat(m, 4);
@@ -166,8 +166,8 @@ public enum MaskType {
      *
      * @since 1.1.0
      */
-    IP_ADDRESS(value -> {
-        char m = maskChar();
+    IP_ADDRESS((value, config) -> {
+        char m = config.getDefaultMaskChar();
         int lastDot = value.lastIndexOf('.');
         if (lastDot < 0) {
             return repeat(m, 8);
@@ -182,7 +182,7 @@ public enum MaskType {
     /**
      * Replaces the entire value with mask characters.
      */
-    TOTAL(value -> repeat(maskChar(), 8)),
+    TOTAL((value, config) -> repeat(config.getDefaultMaskChar(), 8)),
 
     /**
      * Placeholder for custom masking via {@link MaskData#maskChar()} and
@@ -190,12 +190,12 @@ public enum MaskType {
      * The default strategy masks everything; the serializer overrides this
      * when custom parameters are provided.
      */
-    CUSTOM(value -> repeat(maskChar(), 8));
+    CUSTOM((value, config) -> repeat(config.getDefaultMaskChar(), 8));
 
     private final MaskingStrategy strategy;
 
-    MaskType(MaskingStrategy strategy) {
-        this.strategy = strategy;
+    MaskType(ConfigAwareStrategy strategy) {
+        this.strategy = ConfigAwareStrategy.adapt(strategy);
     }
 
     /**
@@ -205,15 +205,6 @@ public enum MaskType {
      */
     public MaskingStrategy getStrategy() {
         return strategy;
-    }
-
-    /**
-     * Returns the current default mask character from global configuration.
-     *
-     * @return the mask character
-     */
-    private static char maskChar() {
-        return MaskingConfig.getInstance().getDefaultMaskChar();
     }
 
     /**

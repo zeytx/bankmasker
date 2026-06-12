@@ -75,7 +75,7 @@ public class MaskingSerializer extends StdSerializer<Object> implements Contextu
             return;
         }
 
-        String masked = strategy.mask(original);
+        String masked = strategy.mask(original, config);
         gen.writeString(masked);
 
         // Audit logging
@@ -127,7 +127,8 @@ public class MaskingSerializer extends StdSerializer<Object> implements Contextu
             char maskChar = annotation.maskChar();
             int visibleStart = Math.max(0, annotation.visibleStart());
             int visibleEnd = Math.max(0, annotation.visibleEnd());
-            return value -> MaskUtils.applyCustomMask(value, maskChar, visibleStart, visibleEnd);
+            return ConfigAwareStrategy.adapt((value, config) ->
+                    MaskUtils.applyCustomMask(value, maskChar, visibleStart, visibleEnd, config));
         }
 
         return type.getStrategy();
