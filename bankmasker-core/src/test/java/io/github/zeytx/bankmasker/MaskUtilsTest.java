@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("MaskUtils — Programmatic masking")
@@ -137,6 +138,33 @@ class MaskUtilsTest {
     void customMaskExplicitCharIgnoresGlobal() {
         MaskingConfig.getInstance().setDefaultMaskChar('#');
         assertEquals("AB@@@@@@IJK", MaskUtils.mask("ABCDEFGHIJK", '@', 2, 3));
+    }
+
+    // --- Fail-closed: visible window >= length (C1) ---
+
+    @Test
+    @DisplayName("value shorter than visible window is fully masked, never leaked")
+    void shorterThanWindowIsFullyMasked() {
+        assertThat(MaskUtils.mask("ABCD", '#', 2, 3)).isEqualTo("####");
+    }
+
+    @Test
+    @DisplayName("value with length equal to visible window is fully masked")
+    void equalToWindowIsFullyMasked() {
+        assertThat(MaskUtils.mask("ABCD", '#', 2, 2)).isEqualTo("####");
+    }
+
+    @Test
+    @DisplayName("single char with visible window is fully masked")
+    void singleCharIsFullyMasked() {
+        assertThat(MaskUtils.mask("A", '#', 1, 0)).isEqualTo("#");
+    }
+
+    @Test
+    @DisplayName("fail-closed mask with default '*' respects global defaultMaskChar")
+    void failClosedRespectsGlobalChar() {
+        MaskingConfig.getInstance().setDefaultMaskChar('#');
+        assertThat(MaskUtils.mask("ABCD", '*', 2, 3)).isEqualTo("####");
     }
 }
 

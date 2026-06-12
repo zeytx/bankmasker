@@ -288,10 +288,11 @@ class MaskingSerializerTest {
         }
 
         @Test
-        @DisplayName("returns original if visible >= length")
-        void returnsOriginalIfAllVisible() throws JsonProcessingException {
+        @DisplayName("fully masks value when visible window >= length (fail-closed)")
+        void masksFullyIfWindowCoversValue() throws JsonProcessingException {
             String json = mapper.writeValueAsString(new CustomDTO("AB"));
-            assertTrue(json.contains("AB"));
+            assertFalse(json.contains("AB"), "must not leak the original value");
+            assertTrue(json.contains("##"));
         }
     }
 

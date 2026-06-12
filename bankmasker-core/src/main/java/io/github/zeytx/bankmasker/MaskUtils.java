@@ -73,14 +73,16 @@ public final class MaskUtils {
         int len = value.length();
         int totalVisible = visibleStart + visibleEnd;
 
-        if (totalVisible >= len) {
-            return value;
-        }
-
         // If the caller uses the default annotation char '*', respect the global config
         char effectiveChar = (maskChar == '*')
                 ? MaskingConfig.getInstance().getDefaultMaskChar()
                 : maskChar;
+
+        // Fail-closed: if the visible window covers the whole value, mask everything
+        // instead of leaking the original (PCI-DSS: never expose the full value).
+        if (totalVisible >= len) {
+            return String.valueOf(effectiveChar).repeat(len);
+        }
 
         String prefix = value.substring(0, visibleStart);
         String suffix = visibleEnd > 0 ? value.substring(len - visibleEnd) : "";
