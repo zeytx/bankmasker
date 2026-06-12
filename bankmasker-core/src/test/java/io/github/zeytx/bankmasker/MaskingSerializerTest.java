@@ -148,10 +148,11 @@ class MaskingSerializerTest {
         }
 
         @Test
-        @DisplayName("masks short local part")
+        @DisplayName("fully masks local part of 1-2 chars (no leak)")
         void masksShortLocalPart() throws JsonProcessingException {
             String json = mapper.writeValueAsString(new EmailDTO("a@example.com"));
-            assertTrue(json.contains("a****@example.com"));
+            assertFalse(json.contains("a****@example.com"), "must not expose the full local part");
+            assertTrue(json.contains("****@example.com"));
         }
 
         @Test

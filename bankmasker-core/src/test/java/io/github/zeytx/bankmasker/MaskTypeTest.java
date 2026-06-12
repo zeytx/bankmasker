@@ -37,7 +37,11 @@ class MaskTypeTest {
     @DisplayName("EMAIL masks correctly")
     @CsvSource({
             "john@mail.com, jo****@mail.com",
-            "a@mail.com, a****@mail.com",
+            "a@mail.com, ****@mail.com",
+            "ab@mail.com, ****@mail.com",
+            "abc@mail.com, ab****@mail.com",
+            "ab@evil@real.com, ab****@real.com",
+            "@mail.com, ********",
             "notanemail, ********"
     })
     void email(String input, String expected) {

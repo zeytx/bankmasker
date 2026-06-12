@@ -42,16 +42,18 @@ public enum MaskType {
     }),
 
     /**
-     * Masks an email address keeping the first 2 characters and the domain.
-     * Falls back to total mask if the format is invalid.
+     * Masks an email address keeping the first 2 characters of the local part
+     * and the domain. Local parts of 1-2 characters are fully masked to avoid
+     * exposing the entire local part. Falls back to total mask if the format
+     * is invalid.
      */
     EMAIL(value -> {
         char m = maskChar();
-        int atIndex = value.indexOf('@');
+        int atIndex = value.lastIndexOf('@');
         if (atIndex <= 0) {
             return repeat(m, 8);
         }
-        int visible = Math.min(2, atIndex);
+        int visible = (atIndex <= 2) ? 0 : 2;
         return value.substring(0, visible) + repeat(m, 4) + value.substring(atIndex);
     }),
 
