@@ -66,7 +66,10 @@ public class MaskingSerializer extends StdSerializer<Object> implements Contextu
 
         MaskingConfig config = resolveConfig(provider);
 
-        if (isContainer(value)) {
+        // char[] is treated as a single secret value, not as a container
+        boolean charArray = value instanceof char[];
+
+        if (!charArray && isContainer(value)) {
             if (!config.isEnabled()) {
                 // Delegate to Jackson so the original structure is preserved
                 provider.defaultSerializeValue(value, gen);
@@ -77,15 +80,21 @@ public class MaskingSerializer extends StdSerializer<Object> implements Contextu
             return;
         }
 
-        String original = value.toString();
+        // Non-String scalars (Number, UUID, …) are masked through their toString()
+        // and always written as a JSON string.
+        String original = charArray ? new String((char[]) value) : value.toString();
         if (original.isEmpty()) {
             gen.writeString(original);
             return;
         }
 
-        // If masking is globally disabled, write the original value
+        // If masking is globally disabled, write the original value with its type
         if (!config.isEnabled()) {
-            gen.writeString(original);
+            if (value instanceof String || charArray) {
+                gen.writeString(original);
+            } else {
+                provider.defaultSerializeValue(value, gen);
+            }
             return;
         }
 

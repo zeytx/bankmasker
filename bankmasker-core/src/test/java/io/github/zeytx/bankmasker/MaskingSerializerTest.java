@@ -114,6 +114,24 @@ class MaskingSerializerTest {
         public IpAddressDTO(String ip) { this.ip = ip; }
     }
 
+    static class LongCardDTO {
+        @MaskData(MaskType.CREDIT_CARD)
+        public Long cardNumber;
+        public LongCardDTO(Long cardNumber) { this.cardNumber = cardNumber; }
+    }
+
+    static class BigDecimalDTO {
+        @MaskData
+        public java.math.BigDecimal balance;
+        public BigDecimalDTO(java.math.BigDecimal balance) { this.balance = balance; }
+    }
+
+    static class CharArrayDTO {
+        @MaskData(MaskType.CREDIT_CARD)
+        public char[] cardNumber;
+        public CharArrayDTO(char[] cardNumber) { this.cardNumber = cardNumber; }
+    }
+
     static class EmailListDTO {
         @MaskData(MaskType.EMAIL)
         public List<String> emails;
@@ -324,6 +342,50 @@ class MaskingSerializerTest {
             String json = mapper.writeValueAsString(new CustomDTO("AB"));
             assertFalse(json.contains("AB"), "must not leak the original value");
             assertTrue(json.contains("##"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Non-String field types")
+    class NonStringTests {
+
+        @Test
+        @DisplayName("masks a Long card number as masked string")
+        void masksLong() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new LongCardDTO(4111111111111111L));
+            assertEquals("{\"cardNumber\":\"****-****-****-1111\"}", json);
+        }
+
+        @Test
+        @DisplayName("masks a BigDecimal with TOTAL")
+        void masksBigDecimal() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new BigDecimalDTO(new java.math.BigDecimal("12345.67")));
+            assertEquals("{\"balance\":\"********\"}", json);
+        }
+
+        @Test
+        @DisplayName("masks char[] content, not its Object toString")
+        void masksCharArray() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new CharArrayDTO("4111111111111111".toCharArray()));
+            assertEquals("{\"cardNumber\":\"****-****-****-1111\"}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, a Number keeps its JSON numeric type")
+        void disabledKeepsNumericType() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            String json = mapper.writeValueAsString(new LongCardDTO(4111111111111111L));
+            assertEquals("{\"cardNumber\":4111111111111111}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, char[] is written as its string content")
+        void disabledCharArrayAsString() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            String json = mapper.writeValueAsString(new CharArrayDTO("1234".toCharArray()));
+            assertEquals("{\"cardNumber\":\"1234\"}", json);
         }
     }
 
