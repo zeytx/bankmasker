@@ -38,6 +38,7 @@
     <modules>
         <module>bankmasker-core</module>
         <module>bankmasker-spring-boot-starter</module>
+        <module>bankmasker-logging</module>
         <module>bankmasker-benchmark</module>
     </modules>
 
@@ -52,10 +53,13 @@
         <junit.version>5.11.4</junit.version>
         <assertj.version>3.27.3</assertj.version>
         <slf4j.version>2.0.16</slf4j.version>
+        <logback.version>1.5.18</logback.version>
+        <log4j.version>2.24.3</log4j.version>
         <spring-boot.version>3.4.2</spring-boot.version>
         <jmh.version>1.37</jmh.version>
 
         <!-- Plugin versions -->
+        <compiler.version>3.13.0</compiler.version>
         <surefire.version>3.5.2</surefire.version>
         <jacoco.version>0.8.12</jacoco.version>
     </properties>
@@ -88,6 +92,17 @@
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-core</artifactId>
+                <version>${log4j.version}</version>
             </dependency>
 
             <!-- Spring Boot -->
@@ -131,6 +146,11 @@
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${compiler.version}</version>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
