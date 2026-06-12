@@ -9,6 +9,9 @@ import com.fasterxml.jackson.databind.ser.ContextualSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Collection;
+import java.util.Map;
 
 /**
  * Jackson serializer that applies masking to sensitive fields annotated with {@link MaskData}.
@@ -61,13 +64,24 @@ public class MaskingSerializer extends StdSerializer<Object> implements Contextu
             return;
         }
 
+        MaskingConfig config = resolveConfig(provider);
+
+        if (isContainer(value)) {
+            if (!config.isEnabled()) {
+                // Delegate to Jackson so the original structure is preserved
+                provider.defaultSerializeValue(value, gen);
+                return;
+            }
+            writeMaskedContainer(value, gen, config);
+            audit(config);
+            return;
+        }
+
         String original = value.toString();
         if (original.isEmpty()) {
             gen.writeString(original);
             return;
         }
-
-        MaskingConfig config = resolveConfig(provider);
 
         // If masking is globally disabled, write the original value
         if (!config.isEnabled()) {
@@ -75,10 +89,58 @@ public class MaskingSerializer extends StdSerializer<Object> implements Contextu
             return;
         }
 
-        String masked = strategy.mask(original, config);
-        gen.writeString(masked);
+        gen.writeString(strategy.mask(original, config));
+        audit(config);
+    }
 
-        // Audit logging
+    private static boolean isContainer(Object value) {
+        return value instanceof Collection || value instanceof Map || value.getClass().isArray();
+    }
+
+    /**
+     * Masks a collection, map or array element by element, preserving the JSON
+     * shape (array/object) instead of masking the container's {@code toString()},
+     * which would change the output type and could leak fragments of elements.
+     */
+    private void writeMaskedContainer(Object value, JsonGenerator gen, MaskingConfig config) throws IOException {
+        if (value instanceof Map<?, ?> map) {
+            gen.writeStartObject();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                gen.writeFieldName(String.valueOf(entry.getKey()));
+                writeMaskedElement(entry.getValue(), gen, config);
+            }
+            gen.writeEndObject();
+            return;
+        }
+
+        gen.writeStartArray();
+        if (value instanceof Collection<?> collection) {
+            for (Object element : collection) {
+                writeMaskedElement(element, gen, config);
+            }
+        } else {
+            int length = Array.getLength(value);
+            for (int i = 0; i < length; i++) {
+                writeMaskedElement(Array.get(value, i), gen, config);
+            }
+        }
+        gen.writeEndArray();
+    }
+
+    private void writeMaskedElement(Object element, JsonGenerator gen, MaskingConfig config) throws IOException {
+        if (element == null) {
+            gen.writeNull();
+            return;
+        }
+        if (isContainer(element)) {
+            writeMaskedContainer(element, gen, config);
+            return;
+        }
+        String original = element.toString();
+        gen.writeString(original.isEmpty() ? original : strategy.mask(original, config));
+    }
+
+    private void audit(MaskingConfig config) {
         MaskingAuditLogger logger = config.getAuditLogger();
         if (logger != null) {
             logger.onFieldMasked(fieldName, maskType);

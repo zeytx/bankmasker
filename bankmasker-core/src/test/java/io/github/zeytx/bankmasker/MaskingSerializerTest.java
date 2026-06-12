@@ -114,6 +114,30 @@ class MaskingSerializerTest {
         public IpAddressDTO(String ip) { this.ip = ip; }
     }
 
+    static class EmailListDTO {
+        @MaskData(MaskType.EMAIL)
+        public List<String> emails;
+        public EmailListDTO(List<String> emails) { this.emails = emails; }
+    }
+
+    static class CustomListDTO {
+        @MaskData(value = MaskType.CUSTOM, maskChar = '#', visibleStart = 2, visibleEnd = 3)
+        public List<String> accounts;
+        public CustomListDTO(List<String> accounts) { this.accounts = accounts; }
+    }
+
+    static class MapDTO {
+        @MaskData(MaskType.TOTAL)
+        public java.util.Map<String, String> secrets;
+        public MapDTO(java.util.Map<String, String> secrets) { this.secrets = secrets; }
+    }
+
+    static class ArrayDTO {
+        @MaskData(MaskType.CREDIT_CARD)
+        public String[] cards;
+        public ArrayDTO(String[] cards) { this.cards = cards; }
+    }
+
     // --- Tests ---
 
     @Nested
@@ -300,6 +324,73 @@ class MaskingSerializerTest {
             String json = mapper.writeValueAsString(new CustomDTO("AB"));
             assertFalse(json.contains("AB"), "must not leak the original value");
             assertTrue(json.contains("##"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Collections, Maps & Arrays")
+    class ContainerTests {
+
+        @Test
+        @DisplayName("masks each element of a List, keeping the JSON array shape")
+        void masksListElements() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new EmailListDTO(List.of("john.doe@mail.com", "jane.roe@mail.com")));
+            assertEquals("{\"emails\":[\"jo****@mail.com\",\"ja****@mail.com\"]}", json);
+        }
+
+        @Test
+        @DisplayName("CUSTOM over a List does not leak the collection toString")
+        void customListDoesNotLeakToString() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new CustomListDTO(List.of("ABCDEFGHIJK")));
+            assertFalse(json.contains("[A"), "must not expose '[' + first chars of toString");
+            assertEquals("{\"accounts\":[\"AB######IJK\"]}", json);
+        }
+
+        @Test
+        @DisplayName("masks Map values, keeps keys visible and object shape")
+        void masksMapValues() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new MapDTO(new java.util.LinkedHashMap<>(java.util.Map.of("apiKey", "super-secret"))));
+            assertEquals("{\"secrets\":{\"apiKey\":\"********\"}}", json);
+        }
+
+        @Test
+        @DisplayName("masks array elements")
+        void masksArrayElements() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new ArrayDTO(new String[]{"4111111111111111", "5500000000000004"}));
+            assertEquals("{\"cards\":[\"****-****-****-1111\",\"****-****-****-0004\"]}", json);
+        }
+
+        @Test
+        @DisplayName("null elements are written as null")
+        void nullElements() throws JsonProcessingException {
+            List<String> withNull = new ArrayList<>();
+            withNull.add("john.doe@mail.com");
+            withNull.add(null);
+            String json = mapper.writeValueAsString(new EmailListDTO(withNull));
+            assertEquals("{\"emails\":[\"jo****@mail.com\",null]}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, serializes the original collection unmasked")
+        void disabledKeepsOriginalCollection() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            String json = mapper.writeValueAsString(
+                    new EmailListDTO(List.of("john.doe@mail.com")));
+            assertEquals("{\"emails\":[\"john.doe@mail.com\"]}", json);
+        }
+
+        @Test
+        @DisplayName("audit logger fires once per masked container field")
+        void auditOncePerContainerField() throws JsonProcessingException {
+            List<String> auditLog = new ArrayList<>();
+            MaskingConfig.getInstance().setAuditLogger((field, type) ->
+                    auditLog.add(field + ":" + type.name()));
+            mapper.writeValueAsString(new EmailListDTO(List.of("a@b.com", "c@d.com")));
+            assertEquals(List.of("emails:EMAIL"), auditLog);
         }
     }
 
