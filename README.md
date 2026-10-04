@@ -3,11 +3,13 @@
 > Lightweight Java library for masking sensitive data during JSON serialization — and beyond.
 
 [![Java](https://img.shields.io/badge/Java-17+-orange)](https://openjdk.org/)
-[![Jackson](https://img.shields.io/badge/Jackson-2.18-blue)](https://github.com/FasterXML/jackson)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.4-green)](https://spring.io/projects/spring-boot)
+[![Jackson](https://img.shields.io/badge/Jackson-2.x_only-blue)](https://github.com/FasterXML/jackson)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-green)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
 [![CI](https://github.com/zeytx/bankmasker/actions/workflows/ci.yml/badge.svg)](https://github.com/zeytx/bankmasker/actions)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.zeytx/bankmasker-core)](https://central.sonatype.com/artifact/io.github.zeytx/bankmasker-core)
+
+> ⚠️ **Jackson 2 only.** `@MaskData` is applied by Jackson 2 (`com.fasterxml.jackson`). Jackson 3 (`tools.jackson`) ignores it and writes the value **in clear text** — and Spring Boot 4 serializes HTTP responses with Jackson 3 by default. On Spring Boot 4, serialize sensitive DTOs with a Jackson 2 `ObjectMapper` until Jackson 3 support lands (planned for 1.2.0). The starter logs a `WARN` at startup when it detects Jackson 3.
 
 ## ✨ Features
 
@@ -43,14 +45,14 @@
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 
 <!-- Spring Boot (includes core automatically) -->
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 
@@ -58,10 +60,10 @@
 
 ```groovy
 // Core only (any Java project)
-implementation 'io.github.zeytx:bankmasker-core:1.1.0'
+implementation 'io.github.zeytx:bankmasker-core:1.1.1'
 
 // Spring Boot (includes core automatically)
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.0'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.1'
 ```
 
 ### Annotate your DTO fields

@@ -4,6 +4,13 @@
 
 BankMasker is the simplest way to mask sensitive fields in Java. Just annotate a String field with `@MaskData` and Jackson automatically masks it. No config needed.
 
+## Compatibility (important)
+
+@MaskData works with Jackson 2 (com.fasterxml.jackson) only. Jackson 3 (tools.jackson) — the
+Spring Boot 4 default for HTTP responses — ignores it and writes values in clear text. On Spring
+Boot 4, serialize sensitive DTOs with a Jackson 2 ObjectMapper. The starter logs a WARN when it
+detects Jackson 3.
+
 ## Quick Start
 
 Add dependency (Maven):
@@ -11,13 +18,13 @@ Add dependency (Maven):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 
 Add dependency (Gradle):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-core:1.1.0'
+implementation 'io.github.zeytx:bankmasker-core:1.1.1'
 ```
 
 Spring Boot (includes core):
@@ -25,7 +32,7 @@ Spring Boot (includes core):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 
@@ -182,7 +189,7 @@ and SSNs from free-text log messages.
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-logging</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 

@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-10-04
+
+### Security
+- **Jackson 3 / Spring Boot 4 warning**: `@MaskData` is only applied by Jackson 2; Jackson 3 (`tools.jackson`, the Spring Boot 4 default for HTTP responses) ignores it and serializes values in clear text. The starter now logs a `WARN` at startup when Jackson 3 is on the classpath, and the limitation is documented. Native Jackson 3 support is planned for 1.2.0
+
 ### Changed
-- Compiled and tested against the latest compatible versions: Jackson 2.22, Spring Boot 3.5, Logback 1.6, Log4j 2.26, SLF4J 2.0.20, JUnit 5.14 (all `provided`/test scope, nothing new is pulled transitively)
+- Compiled and tested against the latest compatible versions: Jackson 2.22, Spring Boot 3.5, Logback 1.6, Log4j 2.26, SLF4J 2.0.20 (all `provided`/test scope, nothing new is pulled transitively)
 - Dependabot groups minor/patch updates and opens a separate PR per major update
+- Tests run on JUnit 6; GitHub Actions upgraded (checkout 7, setup-java 6, upload-artifact 7, action-gh-release 3)
 
 ### Fixed
 - Module POMs published to Central linked to `https://github.com/zeytx/bankmasker/<module>` (404): project and SCM URLs are no longer suffixed with the artifactId; SCM connections use valid HTTPS/SSH URLs
