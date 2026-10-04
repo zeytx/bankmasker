@@ -13,11 +13,12 @@ When a user needs to:
 
 1. **Annotate String fields** with `@MaskData(MaskType.XXX)` — Jackson handles the rest automatically
 2. **For programmatic masking** (logs, toString), use `MaskUtils.mask(value, MaskType.XXX)`
-3. **For custom patterns**, use `@MaskData(value = MaskType.CUSTOM, maskChar = '#', visibleStart = 2, visibleEnd = 3)`
+3. **For log messages and stack traces**, add `bankmasker-logging` and use `%maskedMsg` + `%maskedEx` in the Logback/Log4j2 pattern
+4. **For custom patterns**, use `@MaskData(value = MaskType.CUSTOM, maskChar = '#', visibleStart = 2, visibleEnd = 3)`
 
 ## Available MaskType values
 
-- `CREDIT_CARD`, `EMAIL`, `PHONE`, `DNI`, `IBAN`, `SSN`, `NAME`, `PASSPORT`, `BANK_ACCOUNT`, `IP_ADDRESS`, `TOTAL`, `CUSTOM`
+- `CREDIT_CARD`, `EMAIL`, `PHONE`, `DNI`, `IBAN`, `SSN`, `NAME`, `PASSPORT`, `BANK_ACCOUNT`, `IP_ADDRESS`, `AUTO`, `TOTAL`, `CUSTOM`
 
 ## Key imports
 

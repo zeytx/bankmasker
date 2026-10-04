@@ -95,10 +95,18 @@ public final class MaskingConfig {
     /**
      * Sets the default mask character.
      *
+     * <p>Control characters (e.g. {@code '\n'}, which would allow forging log
+     * lines) and lone UTF-16 surrogates (invalid output) are rejected.
+     *
      * @param defaultMaskChar the character to use for masking
      * @return this instance for chaining
+     * @throws IllegalArgumentException if the character is a control character or a surrogate
      */
     public MaskingConfig setDefaultMaskChar(char defaultMaskChar) {
+        if (Character.isISOControl(defaultMaskChar) || Character.isSurrogate(defaultMaskChar)) {
+            throw new IllegalArgumentException(
+                    "Invalid mask character U+" + String.format("%04X", (int) defaultMaskChar));
+        }
         this.defaultMaskChar = defaultMaskChar;
         return this;
     }

@@ -27,6 +27,12 @@ import java.lang.annotation.Target;
  * }
  * }</pre>
  *
+ * <p>Supported field types: {@code String} and other scalars ({@code Number},
+ * {@code UUID}, {@code char[]}, dates, enums), {@code Optional} of those, and
+ * collections, maps and arrays of them (masked element by element; map keys
+ * stay visible unless {@link #keyMask()} is set). Any other object is fully
+ * masked, never through its {@code toString()}.
+ *
  * @since 1.0.0
  * @see MaskType
  * @see MaskingSerializer
@@ -67,4 +73,22 @@ public @interface MaskData {
      * @return visible characters from the end (defaults to 0)
      */
     int visibleEnd() default 0;
+
+    /**
+     * Mask type applied to the keys of a {@code Map} field. Empty (the default)
+     * keeps keys visible, since they are usually structural ({@code "apiKey"}).
+     * Set a single type when keys are sensitive themselves, e.g. a map keyed by
+     * card number:
+     * <pre>{@code
+     * @MaskData(value = MaskType.TOTAL, keyMask = MaskType.CREDIT_CARD)
+     * Map<String, BigDecimal> balanceByCard;   // {"****-****-****-1111":"********"}
+     * }</pre>
+     * Keys that mask to the same value get a {@code ~2}, {@code ~3}, … suffix so
+     * no entry is lost. {@link MaskType#CUSTOM} uses this annotation's
+     * {@link #maskChar()}, {@link #visibleStart()} and {@link #visibleEnd()}.
+     *
+     * @return at most one mask type for map keys (defaults to none)
+     * @since 1.1.0
+     */
+    MaskType[] keyMask() default {};
 }

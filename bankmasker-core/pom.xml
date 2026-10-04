@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.zeytx</groupId>
         <artifactId>bankmasker-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>bankmasker-core</artifactId>
@@ -16,15 +16,14 @@
     <name>BankMasker Core</name>
     <description>Core masking library — annotations, strategies and serializers</description>
 
+    <properties>
+        <module.name>io.github.zeytx.bankmasker</module.name>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -37,6 +36,11 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

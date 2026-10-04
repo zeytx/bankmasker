@@ -47,3 +47,5 @@ dependency-reduced-pom.xml
 *.asc
 gpg-key-params.txt
 
+
+.tgrep/

@@ -12,9 +12,11 @@
 ## ✨ Features
 
 - **Zero configuration** — just annotate your fields with `@MaskData`
-- **12 built-in mask types** — credit cards, emails, phones, IBANs, SSNs, names, passports, bank accounts, IPs, and more
+- **13 built-in mask types** — credit cards, emails, phones, IBANs, SSNs, names, passports, bank accounts, IPs, auto-detection, and more
 - **Custom masking** — configurable mask character, visible start/end
 - **`MaskUtils`** — use masking in `toString()`, logs, or anywhere
+- **Log masking** — Logback/Log4j2 converters that scrub PANs, emails, IBANs and SSNs from log messages and stack traces
+- **Fail-closed** — short values, unknown formats and arbitrary objects are fully masked, never partially leaked
 - **Java records support** — works with records, classes, and methods
 - **Spring Boot Starter** — auto-configuration via `application.yml`
 - **Per-ObjectMapper config** — `MaskingModule` for multi-tenant / parallel-test scenarios
@@ -28,6 +30,7 @@
 | Module | Description |
 |--------|-------------|
 | `bankmasker-core` | Core library — annotations, strategies, serializer, `MaskUtils` |
+| `bankmasker-logging` | Logback/Log4j2 converters that mask sensitive patterns in log messages |
 | `bankmasker-spring-boot-starter` | Auto-configuration for Spring Boot |
 | `bankmasker-benchmark` | JMH performance benchmarks |
 
@@ -40,14 +43,14 @@
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
 </dependency>
 
 <!-- Spring Boot (includes core automatically) -->
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -55,10 +58,10 @@
 
 ```groovy
 // Core only (any Java project)
-implementation 'io.github.zeytx:bankmasker-core:1.0.1'
+implementation 'io.github.zeytx:bankmasker-core:1.1.0'
 
 // Spring Boot (includes core automatically)
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.0.1'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.0'
 ```
 
 ### Annotate your DTO fields
@@ -170,9 +173,10 @@ bankmasker:
   default-mask-char: '*'       # default mask character
   audit:
     enabled: true              # enable SLF4J audit logging
+    level: INFO                # audit log level (TRACE/DEBUG/INFO/WARN/ERROR)
 ```
 
-The starter auto-configures `MaskingConfig` and optionally enables SLF4J-based audit logging.
+The starter auto-configures `MaskingConfig` and optionally enables SLF4J-based audit logging. It backs off if you declare your own `MaskingConfig` bean, logs a `WARN` at startup when masking is disabled, and fails fast on an invalid mask character (control characters or surrogates).
 
 ## ⚙️ Global Configuration (without Spring)
 
@@ -213,8 +217,23 @@ MaskingConfig.getInstance()
 | `PASSPORT`     | `AB1234567`                    | `AB****567`                    |
 | `BANK_ACCOUNT` | `12345678901234`               | `**********1234`               |
 | `IP_ADDRESS`   | `192.168.1.100`                | `***.***.***.100`               |
+| `AUTO`         | *(card / email / IBAN)*        | *(matching mask, else total)*  |
 | `TOTAL`        | `anything`                     | `********`                     |
 | `CUSTOM`       | *(configurable)*               | *(configurable)*               |
+
+Types that keep the last characters visible **fail closed**: if the visible part would be as large as the hidden one, the value is fully masked (e.g. `CREDIT_CARD` on `12345` → `****`).
+
+`@MaskData` supports `String` and other scalars (`Number`, `UUID`, `char[]`, dates, enums), `Optional` of those, and collections/maps/arrays of them (masked element by element). Any other object is fully masked — never through its `toString()`, which could expose other fields.
+
+Map keys stay visible by default (they are usually structural, like `"apiKey"`). When the keys are sensitive themselves, mask them with their own type:
+
+```java
+@MaskData(value = MaskType.TOTAL, keyMask = MaskType.CREDIT_CARD)
+private Map<String, BigDecimal> balanceByCard;
+// → {"****-****-****-1111":"********", "****-****-****-1111~2":"********"}
+```
+
+Keys that mask to the same value get a `~2`, `~3`, … suffix so no entry is lost.
 
 ## 🔀 Per-ObjectMapper Configuration
 
@@ -243,6 +262,32 @@ public record PaymentRecord(
 ) {}
 ```
 
+## 🪵 Log Masking
+
+The optional `bankmasker-logging` module scrubs sensitive patterns (Luhn-validated card numbers, emails, IBANs — contiguous or printed in groups of 4 — and SSNs) from free-text log messages.
+
+**Logback** (`logback.xml`):
+
+```xml
+<conversionRule conversionWord="maskedMsg"
+                converterClass="io.github.zeytx.bankmasker.logging.logback.MaskingMessageConverter"/>
+<conversionRule conversionWord="maskedEx"
+                converterClass="io.github.zeytx.bankmasker.logging.logback.MaskingThrowableProxyConverter"/>
+<!-- then use %maskedMsg instead of %msg and %maskedEx instead of %ex -->
+<pattern>%d %-5level %logger - %maskedMsg%n%maskedEx</pattern>
+```
+
+**Log4j2** (`log4j2.xml`): use `%maskedMsg` and `%maskedEx` in the pattern layout (both converters are auto-discovered via their plugin annotation).
+
+> ⚠️ Always add `%maskedEx`: if the pattern has no throwable converter, Logback and Log4j2 append the stack trace **unmasked**, and exception messages often carry the same data (`Invalid card 4111…`).
+
+Or programmatically for any other sink:
+
+```java
+String safe = LogMasker.maskMessage("charge card 4111111111111111 approved");
+// → "charge card ****-****-****-1111 approved"
+```
+
 ## 🔌 Extensibility
 
 Implement `MaskingStrategy` for fully custom logic:
@@ -256,9 +301,22 @@ MaskingStrategy myStrategy = value -> value.charAt(0) + "***";
 Run JMH benchmarks to measure serialization overhead:
 
 ```bash
-mvn -pl bankmasker-benchmark package -DskipTests
-java -jar bankmasker-benchmark/target/bankmasker-benchmark.jar
+mvn -pl bankmasker-benchmark -am package -DskipTests
+java -jar bankmasker-benchmark/target/bankmasker-benchmark-*.jar
 ```
+
+Reference results (JDK 25, AMD Ryzen 7 5800XT, 1 fork, 5 × 2 s iterations; higher is better):
+
+| Benchmark | Throughput | Per op |
+|---|---|---|
+| DTO with 11 fields, none masked (baseline) | 2,364 ops/ms | 0.42 µs |
+| Same DTO, 10 fields masked | 588 ops/ms | 1.70 µs |
+| Single `CREDIT_CARD` field | 4,357 ops/ms | 0.23 µs |
+| `AUTO` detection | 747 ops/ms | 1.34 µs |
+| `LogMasker` — clean message (no match) | 341 ops/ms | 2.9 µs |
+| `LogMasker` — PAN in message | 289 ops/ms | 3.5 µs |
+| `LogMasker` — PAN + email + IBAN | 194 ops/ms | 5.2 µs |
+| `LogMasker` — 10 KB token without `@` | 3.5 ops/ms | 0.29 ms |
 
 ## 🧪 Running Tests
 
@@ -277,14 +335,22 @@ bankmasker/
 │   ├── pom.xml
 │   └── src/main/java/.../bankmasker/
 │       ├── MaskData.java                ← @MaskData annotation
-│       ├── MaskType.java                ← Built-in mask types (12)
+│       ├── MaskType.java                ← Built-in mask types (13)
 │       ├── MaskingSerializer.java       ← Jackson serializer
 │       ├── MaskingStrategy.java         ← Strategy interface
 │       ├── MaskUtils.java              ← Programmatic masking
 │       ├── MaskingConfig.java          ← Global + per-mapper config
 │       ├── MaskingModule.java          ← Per-ObjectMapper module
+│       ├── MaskPatterns.java           ← Format detection (card/email/IBAN)
 │       ├── MaskingAuditLogger.java     ← Audit interface
 │       └── Slf4jMaskingAuditLogger.java ← SLF4J audit impl
+├── bankmasker-logging/                  ← Logback/Log4j2 log masking
+│   └── src/main/java/.../logging/
+│       ├── LogMasker.java
+│       ├── logback/MaskingMessageConverter.java
+│       ├── logback/MaskingThrowableProxyConverter.java
+│       ├── log4j2/MaskingMessagePatternConverter.java
+│       └── log4j2/MaskingThrowablePatternConverter.java
 ├── bankmasker-spring-boot-starter/      ← Spring Boot auto-config
 │   ├── pom.xml
 │   └── src/main/java/.../spring/
@@ -301,6 +367,7 @@ bankmasker/
 ├── CONTRIBUTING.md
 ├── LICENSE
 ├── README.md
+├── SECURITY.md                          ← Vulnerability reporting
 ├── llms.txt                             ← AI/LLM quick reference
 └── llms-full.txt                        ← AI/LLM full API docs
 ```
@@ -310,6 +377,10 @@ bankmasker/
 This project includes [`llms.txt`](llms.txt) and [`llms-full.txt`](llms-full.txt) files following the [llms.txt standard](https://llmstxt.org/). These files help AI assistants (ChatGPT, Claude, Copilot, Gemini, etc.) understand how to use BankMasker correctly when generating code.
 
 If you're building with an AI assistant, point it to `llms.txt` for quick reference or `llms-full.txt` for complete API documentation.
+
+## 🔒 Security
+
+See [SECURITY.md](SECURITY.md) for how to report a vulnerability and the library's scope and limitations.
 
 ## 📄 License
 

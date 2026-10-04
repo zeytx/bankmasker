@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 
 /**
  * Jackson module that allows per-{@link ObjectMapper} masking configuration.
@@ -63,11 +62,14 @@ public class MaskingModule extends Module {
 
     @Override
     public void setupModule(SetupContext context) {
-        // Store the per-mapper config as a default attribute on the ObjectMapper
+        // Store the per-mapper config as a *shared* default attribute, keeping any
+        // existing defaults. A per-call attribute here would back the mapper
+        // defaults with a mutable map, so attributes set by any serializer during
+        // one call (provider.setAttribute) would leak into later calls and threads.
         Object owner = context.getOwner();
         if (owner instanceof ObjectMapper mapper) {
-            mapper.setDefaultAttributes(
-                    ContextAttributes.getEmpty().withPerCallAttribute(CONFIG_KEY, config));
+            mapper.setDefaultAttributes(mapper.getSerializationConfig().getAttributes()
+                    .withSharedAttribute(CONFIG_KEY, config));
         }
     }
 

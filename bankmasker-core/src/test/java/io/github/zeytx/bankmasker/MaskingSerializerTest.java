@@ -1,15 +1,23 @@
 package io.github.zeytx.bankmasker;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.cfg.ContextAttributes;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -84,6 +92,12 @@ class MaskingSerializerTest {
         public CustomDTO(String accountId) { this.accountId = accountId; }
     }
 
+    static class CustomDefaultCharDTO {
+        @MaskData(value = MaskType.CUSTOM, visibleStart = 2, visibleEnd = 3)
+        public String accountId;
+        public CustomDefaultCharDTO(String accountId) { this.accountId = accountId; }
+    }
+
     static class NullFieldDTO {
         @MaskData(MaskType.CREDIT_CARD)
         public String cardNumber;
@@ -107,6 +121,114 @@ class MaskingSerializerTest {
         public String ip;
         public IpAddressDTO(String ip) { this.ip = ip; }
     }
+
+    static class LongCardDTO {
+        @MaskData(MaskType.CREDIT_CARD)
+        public Long cardNumber;
+        public LongCardDTO(Long cardNumber) { this.cardNumber = cardNumber; }
+    }
+
+    static class BigDecimalDTO {
+        @MaskData
+        public java.math.BigDecimal balance;
+        public BigDecimalDTO(java.math.BigDecimal balance) { this.balance = balance; }
+    }
+
+    static class CharArrayDTO {
+        @MaskData(MaskType.CREDIT_CARD)
+        public char[] cardNumber;
+        public CharArrayDTO(char[] cardNumber) { this.cardNumber = cardNumber; }
+    }
+
+    static class EmailListDTO {
+        @MaskData(MaskType.EMAIL)
+        public List<String> emails;
+        public EmailListDTO(List<String> emails) { this.emails = emails; }
+    }
+
+    static class CustomListDTO {
+        @MaskData(value = MaskType.CUSTOM, maskChar = '#', visibleStart = 2, visibleEnd = 3)
+        public List<String> accounts;
+        public CustomListDTO(List<String> accounts) { this.accounts = accounts; }
+    }
+
+    static class MapDTO {
+        @MaskData(MaskType.TOTAL)
+        public java.util.Map<String, String> secrets;
+        public MapDTO(java.util.Map<String, String> secrets) { this.secrets = secrets; }
+    }
+
+    static class ArrayDTO {
+        @MaskData(MaskType.CREDIT_CARD)
+        public String[] cards;
+        public ArrayDTO(String[] cards) { this.cards = cards; }
+    }
+
+    static class BalanceByCardDTO {
+        @MaskData(value = MaskType.TOTAL, keyMask = MaskType.CREDIT_CARD)
+        public java.util.Map<String, java.math.BigDecimal> balances;
+        public BalanceByCardDTO(java.util.Map<String, java.math.BigDecimal> balances) { this.balances = balances; }
+    }
+
+    static class TwoKeyMasksDTO {
+        @MaskData(keyMask = {MaskType.EMAIL, MaskType.TOTAL})
+        public java.util.Map<String, String> values = java.util.Map.of("a", "b");
+    }
+
+    /** POJO whose toString() mixes several sensitive fields. */
+    record Holder(String name, String email, String ssn) {
+        @Override
+        public String toString() {
+            return "Holder[name=" + name + ", email=" + email + ", ssn=" + ssn + "]";
+        }
+    }
+
+    static class PojoEmailDTO {
+        @MaskData(MaskType.EMAIL)
+        public Holder holder;
+        public PojoEmailDTO(Holder holder) { this.holder = holder; }
+    }
+
+    static class PojoListDTO {
+        @MaskData(MaskType.DNI)
+        public List<Holder> holders;
+        public PojoListDTO(List<Holder> holders) { this.holders = holders; }
+    }
+
+    static class OptionalCardDTO {
+        @MaskData(MaskType.CREDIT_CARD)
+        public Optional<String> cardNumber;
+        public OptionalCardDTO(Optional<String> cardNumber) { this.cardNumber = cardNumber; }
+    }
+
+    static class CharArrayListDTO {
+        @MaskData(MaskType.NAME)
+        public List<char[]> names;
+        public CharArrayListDTO(List<char[]> names) { this.names = names; }
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    static class NonEmptyDTO {
+        @MaskData(MaskType.EMAIL)
+        public String email;
+        @MaskData(MaskType.EMAIL)
+        public List<String> emails;
+        public NonEmptyDTO(String email, List<String> emails) { this.email = email; this.emails = emails; }
+    }
+
+    /** Writes the "probe" attribute left by a previous call, then sets its own. */
+    static class ProbeSerializer extends StdSerializer<String> {
+        ProbeSerializer() { super(String.class); }
+
+        @Override
+        public void serialize(String value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+            Object previous = provider.getAttribute("probe");
+            provider.setAttribute("probe", value);
+            gen.writeString(String.valueOf(previous));
+        }
+    }
+
+    record ProbeDTO(@JsonSerialize(using = ProbeSerializer.class) String value) {}
 
     // --- Tests ---
 
@@ -148,10 +270,11 @@ class MaskingSerializerTest {
         }
 
         @Test
-        @DisplayName("masks short local part")
+        @DisplayName("fully masks local part of 1-2 chars (no leak)")
         void masksShortLocalPart() throws JsonProcessingException {
             String json = mapper.writeValueAsString(new EmailDTO("a@example.com"));
-            assertTrue(json.contains("a****@example.com"));
+            assertFalse(json.contains("a****@example.com"), "must not expose the full local part");
+            assertTrue(json.contains("****@example.com"));
         }
 
         @Test
@@ -288,10 +411,161 @@ class MaskingSerializerTest {
         }
 
         @Test
-        @DisplayName("returns original if visible >= length")
-        void returnsOriginalIfAllVisible() throws JsonProcessingException {
+        @DisplayName("fully masks value when visible window >= length (fail-closed)")
+        void masksFullyIfWindowCoversValue() throws JsonProcessingException {
             String json = mapper.writeValueAsString(new CustomDTO("AB"));
-            assertTrue(json.contains("AB"));
+            assertFalse(json.contains("AB"), "must not leak the original value");
+            assertTrue(json.contains("##"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Non-String field types")
+    class NonStringTests {
+
+        @Test
+        @DisplayName("masks a Long card number as masked string")
+        void masksLong() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new LongCardDTO(4111111111111111L));
+            assertEquals("{\"cardNumber\":\"****-****-****-1111\"}", json);
+        }
+
+        @Test
+        @DisplayName("masks a BigDecimal with TOTAL")
+        void masksBigDecimal() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new BigDecimalDTO(new java.math.BigDecimal("12345.67")));
+            assertEquals("{\"balance\":\"********\"}", json);
+        }
+
+        @Test
+        @DisplayName("masks char[] content, not its Object toString")
+        void masksCharArray() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new CharArrayDTO("4111111111111111".toCharArray()));
+            assertEquals("{\"cardNumber\":\"****-****-****-1111\"}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, a Number keeps its JSON numeric type")
+        void disabledKeepsNumericType() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            String json = mapper.writeValueAsString(new LongCardDTO(4111111111111111L));
+            assertEquals("{\"cardNumber\":4111111111111111}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, char[] is written as its string content")
+        void disabledCharArrayAsString() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            String json = mapper.writeValueAsString(new CharArrayDTO("1234".toCharArray()));
+            assertEquals("{\"cardNumber\":\"1234\"}", json);
+        }
+    }
+
+    @Nested
+    @DisplayName("Collections, Maps & Arrays")
+    class ContainerTests {
+
+        @Test
+        @DisplayName("masks each element of a List, keeping the JSON array shape")
+        void masksListElements() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new EmailListDTO(List.of("john.doe@mail.com", "jane.roe@mail.com")));
+            assertEquals("{\"emails\":[\"jo****@mail.com\",\"ja****@mail.com\"]}", json);
+        }
+
+        @Test
+        @DisplayName("CUSTOM over a List does not leak the collection toString")
+        void customListDoesNotLeakToString() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new CustomListDTO(List.of("ABCDEFGHIJK")));
+            assertFalse(json.contains("[A"), "must not expose '[' + first chars of toString");
+            assertEquals("{\"accounts\":[\"AB######IJK\"]}", json);
+        }
+
+        @Test
+        @DisplayName("masks Map values, keeps keys visible and object shape")
+        void masksMapValues() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new MapDTO(new java.util.LinkedHashMap<>(java.util.Map.of("apiKey", "super-secret"))));
+            assertEquals("{\"secrets\":{\"apiKey\":\"********\"}}", json);
+        }
+
+        @Test
+        @DisplayName("keyMask masks map keys with their own type")
+        void masksMapKeys() throws JsonProcessingException {
+            var balances = new java.util.LinkedHashMap<String, java.math.BigDecimal>();
+            balances.put("4111111111111111", new java.math.BigDecimal("1500.00"));
+            balances.put("5500000000000004", new java.math.BigDecimal("20.00"));
+            String json = mapper.writeValueAsString(new BalanceByCardDTO(balances));
+            assertEquals("{\"balances\":{\"****-****-****-1111\":\"********\","
+                    + "\"****-****-****-0004\":\"********\"}}", json);
+        }
+
+        @Test
+        @DisplayName("keys that mask to the same value get a suffix, no entry is lost")
+        void maskedKeyCollisions() throws JsonProcessingException {
+            var balances = new java.util.LinkedHashMap<String, java.math.BigDecimal>();
+            balances.put("1234567812341111", java.math.BigDecimal.ONE);
+            balances.put("8765432187651111", java.math.BigDecimal.TEN);
+            String json = mapper.writeValueAsString(new BalanceByCardDTO(balances));
+            assertEquals("{\"balances\":{\"****-****-****-1111\":\"********\","
+                    + "\"****-****-****-1111~2\":\"********\"}}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, keyMask keeps the original keys")
+        void disabledKeepsKeys() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            var balances = new java.util.LinkedHashMap<String, java.math.BigDecimal>();
+            balances.put("4111111111111111", java.math.BigDecimal.ONE);
+            assertEquals("{\"balances\":{\"4111111111111111\":1}}",
+                    mapper.writeValueAsString(new BalanceByCardDTO(balances)));
+        }
+
+        @Test
+        @DisplayName("keyMask with more than one type is rejected")
+        void rejectsSeveralKeyMasks() {
+            assertThrows(com.fasterxml.jackson.databind.JsonMappingException.class,
+                    () -> mapper.writeValueAsString(new TwoKeyMasksDTO()));
+        }
+
+        @Test
+        @DisplayName("masks array elements")
+        void masksArrayElements() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new ArrayDTO(new String[]{"4111111111111111", "5500000000000004"}));
+            assertEquals("{\"cards\":[\"****-****-****-1111\",\"****-****-****-0004\"]}", json);
+        }
+
+        @Test
+        @DisplayName("null elements are written as null")
+        void nullElements() throws JsonProcessingException {
+            List<String> withNull = new ArrayList<>();
+            withNull.add("john.doe@mail.com");
+            withNull.add(null);
+            String json = mapper.writeValueAsString(new EmailListDTO(withNull));
+            assertEquals("{\"emails\":[\"jo****@mail.com\",null]}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, serializes the original collection unmasked")
+        void disabledKeepsOriginalCollection() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            String json = mapper.writeValueAsString(
+                    new EmailListDTO(List.of("john.doe@mail.com")));
+            assertEquals("{\"emails\":[\"john.doe@mail.com\"]}", json);
+        }
+
+        @Test
+        @DisplayName("audit logger fires once per masked container field")
+        void auditOncePerContainerField() throws JsonProcessingException {
+            List<String> auditLog = new ArrayList<>();
+            MaskingConfig.getInstance().setAuditLogger((field, type) ->
+                    auditLog.add(field + ":" + type.name()));
+            mapper.writeValueAsString(new EmailListDTO(List.of("a@b.com", "c@d.com")));
+            assertEquals(List.of("emails:EMAIL"), auditLog);
         }
     }
 
@@ -383,6 +657,49 @@ class MaskingSerializerTest {
         }
     }
 
+    static class AutoDTO {
+        @MaskData(MaskType.AUTO)
+        public Object value;
+        public AutoDTO(Object value) { this.value = value; }
+    }
+
+    @Nested
+    @DisplayName("Auto Detection Masking")
+    class AutoTests {
+
+        @Test
+        @DisplayName("detects and masks a credit card")
+        void detectsCreditCard() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new AutoDTO("4111111111111111"));
+            assertTrue(json.contains("****-****-****-1111"));
+        }
+
+        @Test
+        @DisplayName("detects and masks an email")
+        void detectsEmail() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new AutoDTO("john.doe@mail.com"));
+            assertTrue(json.contains("jo****@mail.com"));
+        }
+
+        @Test
+        @DisplayName("falls back to total mask for unknown formats")
+        void fallsBackToTotal() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new AutoDTO("free-form text"));
+            assertTrue(json.contains("********"));
+            assertFalse(json.contains("free-form"));
+        }
+
+        @Test
+        @DisplayName("detects each element inside a list independently")
+        void detectsElementsInList() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new AutoDTO(List.of("4111111111111111", "john.doe@mail.com", "other")));
+            assertTrue(json.contains("****-****-****-1111"));
+            assertTrue(json.contains("jo****@mail.com"));
+            assertTrue(json.contains("********"));
+        }
+    }
+
     @Nested
     @DisplayName("Passport Masking")
     class PassportTests {
@@ -470,8 +787,86 @@ class MaskingSerializerTest {
     }
 
     @Nested
+    @DisplayName("Non-scalar values & Optional")
+    class NonScalarTests {
+
+        @Test
+        @DisplayName("POJO is fully masked, never through its toString()")
+        void pojoFullyMasked() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new PojoEmailDTO(new Holder("Bob", "bob@mail.com", "123-45-6789")));
+            assertEquals("{\"holder\":\"********\"}", json);
+        }
+
+        @Test
+        @DisplayName("POJO elements of a collection are fully masked")
+        void pojoElementsFullyMasked() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new PojoListDTO(List.of(new Holder("Bob", "bob@mail.com", "123-45-6789"))));
+            assertEquals("{\"holders\":[\"********\"]}", json);
+        }
+
+        @Test
+        @DisplayName("Optional is unwrapped and its content masked")
+        void optionalUnwrapped() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new OptionalCardDTO(Optional.of("4111111111111111")));
+            assertEquals("{\"cardNumber\":\"****-****-****-1111\"}", json);
+        }
+
+        @Test
+        @DisplayName("empty Optional is written as null")
+        void emptyOptionalIsNull() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new OptionalCardDTO(Optional.empty()));
+            assertEquals("{\"cardNumber\":null}", json);
+        }
+
+        @Test
+        @DisplayName("when disabled, Optional content is written as is")
+        void disabledOptional() throws JsonProcessingException {
+            MaskingConfig.getInstance().setEnabled(false);
+            String json = mapper.writeValueAsString(new OptionalCardDTO(Optional.of("4111111111111111")));
+            assertEquals("{\"cardNumber\":\"4111111111111111\"}", json);
+        }
+
+        @Test
+        @DisplayName("char[] inside a collection is one secret, not a list of chars")
+        void charArrayElement() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(
+                    new CharArrayListDTO(List.<char[]>of("John".toCharArray())));
+            assertEquals("{\"names\":[\"J***\"]}", json);
+        }
+
+        @Test
+        @DisplayName("@JsonInclude(NON_EMPTY) skips empty masked values")
+        void nonEmptyInclusion() throws JsonProcessingException {
+            String json = mapper.writeValueAsString(new NonEmptyDTO("", List.of()));
+            assertEquals("{}", json);
+        }
+    }
+
+    @Nested
     @DisplayName("MaskingModule — per-ObjectMapper config")
     class MaskingModuleTests {
+
+        @Test
+        @DisplayName("keeps default attributes already set on the mapper")
+        void keepsExistingDefaultAttributes() {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.setDefaultAttributes(ContextAttributes.getEmpty().withSharedAttribute("tenant", "acme"));
+            customMapper.registerModule(new MaskingModule(MaskingConfig.create()));
+
+            assertEquals("acme", customMapper.getSerializationConfig().getAttributes().getAttribute("tenant"));
+        }
+
+        @Test
+        @DisplayName("per-call attributes do not leak into later calls")
+        void perCallAttributesDoNotLeak() throws JsonProcessingException {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.registerModule(new MaskingModule(MaskingConfig.create()));
+
+            assertEquals("{\"value\":\"null\"}", customMapper.writeValueAsString(new ProbeDTO("first")));
+            assertEquals("{\"value\":\"null\"}", customMapper.writeValueAsString(new ProbeDTO("second")));
+        }
 
         @Test
         @DisplayName("per-mapper config overrides global singleton")
@@ -496,6 +891,51 @@ class MaskingSerializerTest {
         @DisplayName("MaskingModule rejects null config")
         void rejectsNullConfig() {
             assertThrows(IllegalArgumentException.class, () -> new MaskingModule(null));
+        }
+
+        @Test
+        @DisplayName("per-mapper defaultMaskChar applies to built-in types")
+        void perMapperMaskCharBuiltIn() throws JsonProcessingException {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.registerModule(new MaskingModule(
+                    MaskingConfig.create().setDefaultMaskChar('#')));
+
+            String json = customMapper.writeValueAsString(new CreditCardDTO("4111111111111111"));
+            assertTrue(json.contains("####-####-####-1111"), "per-mapper maskChar must apply, got: " + json);
+
+            // Global mapper keeps '*'
+            String globalJson = mapper.writeValueAsString(new CreditCardDTO("4111111111111111"));
+            assertTrue(globalJson.contains("****-****-****-1111"));
+        }
+
+        @Test
+        @DisplayName("per-mapper defaultMaskChar applies to TOTAL")
+        void perMapperMaskCharTotal() throws JsonProcessingException {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.registerModule(new MaskingModule(
+                    MaskingConfig.create().setDefaultMaskChar('#')));
+
+            String json = customMapper.writeValueAsString(new TotalDTO("secret"));
+            assertTrue(json.contains("########"), "got: " + json);
+        }
+
+        @Test
+        @DisplayName("per-mapper defaultMaskChar applies to CUSTOM with default char")
+        void perMapperMaskCharCustom() throws JsonProcessingException {
+            ObjectMapper customMapper = new ObjectMapper();
+            customMapper.registerModule(new MaskingModule(
+                    MaskingConfig.create().setDefaultMaskChar('#')));
+
+            String json = customMapper.writeValueAsString(new CustomDefaultCharDTO("ABCDEFGHIJK"));
+            assertTrue(json.contains("AB######IJK"), "got: " + json);
+        }
+
+        @Test
+        @DisplayName("custom MaskingStrategy lambdas keep working (backward compat)")
+        void customStrategyBackwardCompat() {
+            MaskingStrategy custom = v -> "XXX";
+            assertEquals("XXX", custom.mask("secret"));
+            assertEquals("XXX", custom.mask("secret", MaskingConfig.create()));
         }
     }
 }

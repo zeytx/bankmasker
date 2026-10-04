@@ -16,7 +16,7 @@ Maven (core only):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -25,18 +25,18 @@ Maven (Spring Boot — includes core):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
 Gradle (core only):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-core:1.0.1'
+implementation 'io.github.zeytx:bankmasker-core:1.1.0'
 ```
 
 Gradle (Spring Boot):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.0.1'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.0'
 ```
 
 ---
@@ -60,17 +60,24 @@ public @interface MaskData {
     char maskChar() default '*';
     int visibleStart() default 0;
     int visibleEnd() default 0;
+    MaskType[] keyMask() default {};   // since 1.1.0: mask Map keys with this (single) type
 }
 ```
 
-## Complete Source: MaskType.java (12 built-in types)
+Supported field types: String and other scalars (Number, UUID, char[], java.time
+dates, enums), Optional of those (empty → null), and collections/maps/arrays of
+them (masked element by element, JSON shape preserved; map keys visible unless
+`keyMask` is set — colliding masked keys get a `~2`, `~3`, … suffix). Any
+other object (POJO) is fully masked as `********` — never via its toString().
+
+## Complete Source: MaskType.java (13 built-in types)
 
 Available enum values and their behavior:
 
 | MaskType | Example Input | Example Output | Rule |
 |----------|--------------|----------------|------|
 | CREDIT_CARD | 4111111111111111 | ****-****-****-1111 | strips non-digits, keeps last 4 |
-| EMAIL | john@example.com | jo****@example.com | keeps first 2 chars + domain |
+| EMAIL | john@example.com | jo****@example.com | keeps first 2 chars + domain (local part of 3: first char; 1-2: none) |
 | PHONE | +525512345678 | ********5678 | strips non-digits, keeps last 4 |
 | DNI | ABCD123456 | ******3456 | keeps last 4 chars |
 | IBAN | ES6621000418401234567891 | ES******************7891 | keeps country code (2) + last 4 |
@@ -79,10 +86,15 @@ Available enum values and their behavior:
 | PASSPORT | AB1234567 | AB****567 | keeps first 2 + last 3 |
 | BANK_ACCOUNT | 12345678901234 | **********1234 | strips non-digits, keeps last 4 |
 | IP_ADDRESS | 192.168.1.100 | ***.***.***.100 | keeps last octet, masks others with *** |
+| AUTO | (card/email/IBAN) | (matching mask) | detects format via MaskPatterns; total mask if unknown |
 | TOTAL | anything | ******** | replaces entire value |
 | CUSTOM | (configurable) | (configurable) | uses maskChar, visibleStart, visibleEnd |
 
 All built-in types respect `MaskingConfig.getDefaultMaskChar()`.
+
+Fail-closed: types that keep the last characters (CREDIT_CARD, PHONE, DNI, IBAN,
+SSN, BANK_ACCOUNT) fully mask values whose visible part would be as large as
+the hidden one, e.g. CREDIT_CARD on "12345" → "****", IBAN shorter than 12 → "****".
 
 ## Complete Source: MaskUtils.java (programmatic masking)
 
@@ -124,7 +136,7 @@ public final class MaskingConfig {
     public MaskingConfig setEnabled(boolean enabled);
 
     public char getDefaultMaskChar();                        // default: '*'
-    public MaskingConfig setDefaultMaskChar(char c);
+    public MaskingConfig setDefaultMaskChar(char c);       // rejects control chars & surrogates
 
     public MaskingAuditLogger getAuditLogger();              // default: null
     public MaskingConfig setAuditLogger(MaskingAuditLogger logger);
@@ -185,11 +197,75 @@ public interface MaskingAuditLogger {
 ```java
 package io.github.zeytx.bankmasker;
 
+import org.slf4j.event.Level;
+
 public class Slf4jMaskingAuditLogger implements MaskingAuditLogger {
+    public Slf4jMaskingAuditLogger();             // logs at INFO
+    public Slf4jMaskingAuditLogger(Level level);  // logs at the given level
+    public Level getLevel();
     // Logs: [BankMasker] Masked field '{fieldName}' using {maskType}
     public void onFieldMasked(String fieldName, MaskType maskType);
 }
 ```
+
+## Complete Source: MaskPatterns.java (format detection)
+
+```java
+package io.github.zeytx.bankmasker;
+
+public final class MaskPatterns {
+    // 13-19 digits (optional single space/dash separators) passing Luhn
+    public static boolean isCreditCard(String value);
+    public static boolean isEmail(String value);
+    // country code + 2 check digits + 11-30 alphanumerics, spaces allowed
+    public static boolean isIban(String value);
+    public static boolean passesLuhn(String digits);
+}
+```
+
+Used by `MaskType.AUTO` and the `bankmasker-logging` module.
+
+## bankmasker-logging module (free-text log masking)
+
+Maven:
+```xml
+<dependency>
+    <groupId>io.github.zeytx</groupId>
+    <artifactId>bankmasker-logging</artifactId>
+    <version>1.1.0</version>
+</dependency>
+```
+
+Masks Luhn-validated PANs, emails, IBANs (contiguous or printed in groups of 4)
+and SSNs found anywhere in a log message. Respects the global MaskingConfig.
+
+```java
+package io.github.zeytx.bankmasker.logging;
+
+public final class LogMasker {
+    public static String maskMessage(String message);
+}
+```
+
+Logback (logback.xml):
+```xml
+<conversionRule conversionWord="maskedMsg"
+                converterClass="io.github.zeytx.bankmasker.logging.logback.MaskingMessageConverter"/>
+<conversionRule conversionWord="maskedEx"
+                converterClass="io.github.zeytx.bankmasker.logging.logback.MaskingThrowableProxyConverter"/>
+<!-- use %maskedMsg instead of %msg and %maskedEx instead of %ex -->
+<pattern>%d %-5level %logger - %maskedMsg%n%maskedEx</pattern>
+```
+
+Log4j2: use `%maskedMsg` (or `%mm`) and `%maskedEx` (or `%mex`) in the
+PatternLayout — the converters
+(`io.github.zeytx.bankmasker.logging.log4j2.MaskingMessagePatternConverter`,
+`io.github.zeytx.bankmasker.logging.log4j2.MaskingThrowablePatternConverter`)
+are auto-discovered via their @Plugin annotation.
+
+Always include `%maskedEx` (options as for `%ex`, e.g. `%maskedEx{short}`):
+if the pattern has no throwable converter, Logback and Log4j2 append the
+stack trace unmasked, and exception messages often contain sensitive data.
 
 ## Spring Boot Auto-Configuration
 
@@ -200,9 +276,13 @@ bankmasker:
   default-mask-char: '*'     # default: *
   audit:
     enabled: false           # default: false — set true for SLF4J audit logging
+    level: INFO              # default: INFO — TRACE/DEBUG/INFO/WARN/ERROR
 ```
 
 Auto-configures `MaskingConfig` bean and optionally registers `Slf4jMaskingAuditLogger`.
+Backs off when the application declares its own `MaskingConfig` bean, logs a WARN when
+`bankmasker.enabled=false`, and fails at startup on an invalid mask character
+(control characters or UTF-16 surrogates).
 
 ---
 
@@ -221,6 +301,7 @@ public class SensitiveDTO {
     @MaskData(MaskType.PASSPORT)     private String passport;
     @MaskData(MaskType.BANK_ACCOUNT) private String account;
     @MaskData(MaskType.IP_ADDRESS)   private String ip;
+    @MaskData(MaskType.AUTO)         private String detected;   // card/email/IBAN auto-detect
     @MaskData                        private String secret;     // TOTAL
     @MaskData(value = MaskType.CUSTOM, maskChar = '#', visibleStart = 2, visibleEnd = 3)
     private String custom;

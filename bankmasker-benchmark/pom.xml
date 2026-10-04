@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.zeytx</groupId>
         <artifactId>bankmasker-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>bankmasker-benchmark</artifactId>
@@ -16,11 +16,19 @@
     <name>BankMasker Benchmark</name>
     <description>JMH benchmarks for BankMasker serialization performance</description>
 
+    <properties>
+        <module.name>io.github.zeytx.bankmasker.benchmark</module.name>
+    </properties>
+
 
     <dependencies>
         <dependency>
             <groupId>io.github.zeytx</groupId>
             <artifactId>bankmasker-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.zeytx</groupId>
+            <artifactId>bankmasker-logging</artifactId>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -39,6 +47,21 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- JDK 23+ disables implicit annotation processing; without the
+                         JMH processor the jar has no META-INF/BenchmarkList -->
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.openjdk.jmh</groupId>
+                            <artifactId>jmh-generator-annprocess</artifactId>
+                            <version>${jmh.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

@@ -1,5 +1,7 @@
 package io.github.zeytx.bankmasker.spring;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
 /**
  * Configuration properties for BankMasker.
  *
@@ -10,10 +12,12 @@ package io.github.zeytx.bankmasker.spring;
  *   default-mask-char: '*'
  *   audit:
  *     enabled: true
+ *     level: INFO
  * </pre>
  *
  * @since 1.0.0
  */
+@ConfigurationProperties(prefix = "bankmasker")
 public class BankMaskerProperties {
 
     /**
@@ -65,12 +69,25 @@ public class BankMaskerProperties {
          */
         private boolean enabled = false;
 
+        /**
+         * SLF4J level for audit log entries (TRACE, DEBUG, INFO, WARN, ERROR).
+         */
+        private String level = "INFO";
+
         public boolean isEnabled() {
             return enabled;
         }
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public String getLevel() {
+            return level;
+        }
+
+        public void setLevel(String level) {
+            this.level = level;
         }
     }
 }
