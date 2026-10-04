@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Compiled and tested against the latest compatible versions: Jackson 2.22, Spring Boot 3.5, Logback 1.6, Log4j 2.26, SLF4J 2.0.20, JUnit 5.14 (all `provided`/test scope, nothing new is pulled transitively)
+- Dependabot groups minor/patch updates and opens a separate PR per major update
+
 ### Fixed
 - Module POMs published to Central linked to `https://github.com/zeytx/bankmasker/<module>` (404): project and SCM URLs are no longer suffixed with the artifactId; SCM connections use valid HTTPS/SSH URLs
 - Release workflow failed after publishing because `central-publishing-maven-plugin` 0.7.0 could not parse the current Central API response; upgraded to 0.11.0

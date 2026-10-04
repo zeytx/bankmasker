@@ -1,17 +1,20 @@
 version: 2
 updates:
+  # Minor/patch updates arrive grouped in one PR; each major update gets its
+  # own PR so a breaking upgrade (e.g. Spring Boot 4, JUnit 6) never blocks
+  # the safe ones.
   - package-ecosystem: maven
     directory: /
     schedule:
       interval: weekly
     groups:
-      maven-dependencies:
-        patterns: ["*"]
+      maven-minor-patch:
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     groups:
-      github-actions:
-        patterns: ["*"]
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
