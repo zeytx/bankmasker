@@ -11,13 +11,13 @@ Add dependency (Maven):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
 Add dependency (Gradle):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-core:1.0.1'
+implementation 'io.github.zeytx:bankmasker-core:1.1.0'
 ```
 
 Spring Boot (includes core):
@@ -25,7 +25,7 @@ Spring Boot (includes core):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -69,6 +69,9 @@ public class PaymentDTO {
 
     @MaskData(MaskType.IP_ADDRESS)
     private String ip;                // "192.168.1.100" → "***.***.***.100"
+
+    @MaskData(MaskType.AUTO)
+    private String detected;          // detects card/email/IBAN, else total mask
 
     @MaskData
     private String secret;            // defaults to TOTAL: "anything" → "********"
@@ -167,6 +170,41 @@ bankmasker:
   default-mask-char: '*'
   audit:
     enabled: true
+    level: INFO        # TRACE/DEBUG/INFO/WARN/ERROR
+```
+
+### Log masking (bankmasker-logging module)
+
+Scrubs Luhn-validated card numbers, emails, IBANs (contiguous or in groups of 4)
+and SSNs from free-text log messages.
+
+```xml
+<dependency>
+    <groupId>io.github.zeytx</groupId>
+    <artifactId>bankmasker-logging</artifactId>
+    <version>1.1.0</version>
+</dependency>
+```
+
+Logback (logback.xml) — register both converters; use %maskedMsg instead of %msg and %maskedEx instead of %ex:
+```xml
+<conversionRule conversionWord="maskedMsg"
+                converterClass="io.github.zeytx.bankmasker.logging.logback.MaskingMessageConverter"/>
+<conversionRule conversionWord="maskedEx"
+                converterClass="io.github.zeytx.bankmasker.logging.logback.MaskingThrowableProxyConverter"/>
+<pattern>%d %-5level %logger - %maskedMsg%n%maskedEx</pattern>
+```
+
+Log4j2 — use %maskedMsg (or %mm) and %maskedEx (or %mex) in the pattern layout (plugins auto-discovered).
+
+Always include %maskedEx: without a throwable converter, Logback/Log4j2 append the stack trace unmasked.
+
+Programmatic:
+```java
+import io.github.zeytx.bankmasker.logging.LogMasker;
+
+String safe = LogMasker.maskMessage("charge card 4111111111111111 approved");
+// → "charge card ****-****-****-1111 approved"
 ```
 
 ### Custom strategy
@@ -189,20 +227,23 @@ MaskingStrategy myStrategy = value -> value.charAt(0) + "***";
 - `PASSPORT` — keeps first 2 + last 3 characters
 - `BANK_ACCOUNT` — keeps last 4 digits
 - `IP_ADDRESS` — keeps last octet
+- `AUTO` — detects card (Luhn) / email / IBAN and applies the matching mask; total mask otherwise
 - `TOTAL` — masks everything (default)
 - `CUSTOM` — configurable via maskChar, visibleStart, visibleEnd
 
 ## Key classes
 
 - `io.github.zeytx.bankmasker.MaskData` — annotation
-- `io.github.zeytx.bankmasker.MaskType` — enum with 12 built-in types
+- `io.github.zeytx.bankmasker.MaskType` — enum with 13 built-in types
 - `io.github.zeytx.bankmasker.MaskUtils` — programmatic masking utility
 - `io.github.zeytx.bankmasker.MaskingConfig` — global/per-mapper configuration
 - `io.github.zeytx.bankmasker.MaskingModule` — Jackson module for per-ObjectMapper config
 - `io.github.zeytx.bankmasker.MaskingStrategy` — functional interface for custom logic
 - `io.github.zeytx.bankmasker.MaskingSerializer` — Jackson serializer (internal)
 - `io.github.zeytx.bankmasker.MaskingAuditLogger` — audit interface
-- `io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger` — SLF4J audit implementation
+- `io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger` — SLF4J audit implementation (configurable level)
+- `io.github.zeytx.bankmasker.MaskPatterns` — detection helpers (isCreditCard/isEmail/isIban/passesLuhn)
+- `io.github.zeytx.bankmasker.logging.LogMasker` — free-text log masking (bankmasker-logging)
 
 ## Requirements
 
@@ -210,4 +251,5 @@ MaskingStrategy myStrategy = value -> value.charAt(0) + "***";
 - Jackson 2.18+ (provided scope — you bring your own)
 - Optional: Spring Boot 3.4+ for auto-configuration
 - Optional: SLF4J for audit logging
+- Optional: Logback or Log4j2 for the bankmasker-logging converters
 
