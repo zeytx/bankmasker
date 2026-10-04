@@ -59,6 +59,12 @@ class MaskUtilsTest {
     }
 
     @Test
+    @DisplayName("custom mask with huge visible window does not overflow")
+    void customMaskNoOverflow() {
+        assertEquals("######", MaskUtils.mask("ABCDEF", '#', Integer.MAX_VALUE, Integer.MAX_VALUE));
+    }
+
+    @Test
     @DisplayName("custom mask bypasses when disabled")
     void disabledCustomBypass() {
         MaskingConfig.getInstance().setEnabled(false);

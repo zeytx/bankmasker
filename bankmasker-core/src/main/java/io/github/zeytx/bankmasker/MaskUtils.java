@@ -88,7 +88,8 @@ public final class MaskUtils {
     static String applyCustomMask(String value, char maskChar, int visibleStart, int visibleEnd,
                                   MaskingConfig config) {
         int len = value.length();
-        int totalVisible = visibleStart + visibleEnd;
+        // long: visibleStart + visibleEnd may overflow int
+        long totalVisible = (long) visibleStart + visibleEnd;
 
         // If the caller uses the default annotation char '*', respect the config
         char effectiveChar = (maskChar == '*')
@@ -103,7 +104,7 @@ public final class MaskUtils {
 
         String prefix = value.substring(0, visibleStart);
         String suffix = visibleEnd > 0 ? value.substring(len - visibleEnd) : "";
-        String masked = String.valueOf(effectiveChar).repeat(len - totalVisible);
+        String masked = String.valueOf(effectiveChar).repeat(len - (int) totalVisible);
         return prefix + masked + suffix;
     }
 }

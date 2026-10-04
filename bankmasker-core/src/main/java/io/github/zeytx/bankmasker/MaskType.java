@@ -7,6 +7,10 @@ package io.github.zeytx.bankmasker;
  * <p>All built-in strategies respect {@link MaskingConfig#getDefaultMaskChar()},
  * so changing the global mask character will affect all types.
  *
+ * <p>Strategies that keep the last characters visible fail closed: values too
+ * short for the visible part to be smaller than the hidden part are fully
+ * masked (e.g. {@code CREDIT_CARD} on {@code "12345"} yields {@code ****}).
+ *
  * <p>Examples (using default mask char {@code '*'}):
  * <ul>
  *   <li>{@code CREDIT_CARD}: {@code 4111111111111111 → ****-****-****-1111}</li>
@@ -19,6 +23,7 @@ package io.github.zeytx.bankmasker;
  *   <li>{@code PASSPORT}: {@code AB1234567 → AB****567}</li>
  *   <li>{@code BANK_ACCOUNT}: {@code 12345678901234 → **********1234}</li>
  *   <li>{@code IP_ADDRESS}: {@code 192.168.1.100 → ***.***.***.100}</li>
+ *   <li>{@code AUTO}: detects card/email/IBAN, otherwise total mask</li>
  *   <li>{@code TOTAL}: {@code anything → ********}</li>
  * </ul>
  *
@@ -33,7 +38,7 @@ public enum MaskType {
     CREDIT_CARD((value, config) -> {
         char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
-        if (digits.length() < 4) {
+        if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 4);
         }
         String block = repeat(m, 4);
@@ -43,9 +48,9 @@ public enum MaskType {
 
     /**
      * Masks an email address keeping the first 2 characters of the local part
-     * and the domain. Local parts of 1-2 characters are fully masked to avoid
-     * exposing the entire local part. Falls back to total mask if the format
-     * is invalid.
+     * and the domain. Local parts of 1-2 characters are fully masked and
+     * 3-character ones keep only the first, so the visible part never exceeds
+     * the hidden one. Falls back to total mask if the format is invalid.
      */
     EMAIL((value, config) -> {
         char m = config.getDefaultMaskChar();
@@ -53,7 +58,8 @@ public enum MaskType {
         if (atIndex <= 0) {
             return repeat(m, 8);
         }
-        int visible = (atIndex <= 2) ? 0 : 2;
+        // Never reveal more of the local part than is hidden
+        int visible = (atIndex <= 2) ? 0 : (atIndex == 3 ? 1 : 2);
         return value.substring(0, visible) + repeat(m, 4) + value.substring(atIndex);
     }),
 
@@ -63,7 +69,7 @@ public enum MaskType {
     PHONE((value, config) -> {
         char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
-        if (digits.length() < 4) {
+        if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 4);
         }
         return repeat(m, digits.length() - 4) + digits.substring(digits.length() - 4);
@@ -74,7 +80,7 @@ public enum MaskType {
      */
     DNI((value, config) -> {
         char m = config.getDefaultMaskChar();
-        if (value.length() <= 4) {
+        if (exposesTooMuch(value.length(), 4)) {
             return repeat(m, 4);
         }
         return repeat(m, value.length() - 4) + value.substring(value.length() - 4);
@@ -87,7 +93,7 @@ public enum MaskType {
     IBAN((value, config) -> {
         char m = config.getDefaultMaskChar();
         String clean = value.replaceAll("\\s", "");
-        if (clean.length() <= 6) {
+        if (exposesTooMuch(clean.length(), 6)) {
             return repeat(m, 4);
         }
         String country = clean.substring(0, 2);
@@ -102,7 +108,7 @@ public enum MaskType {
     SSN((value, config) -> {
         char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
-        if (digits.length() < 4) {
+        if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 3) + "-" + repeat(m, 2) + "-" + repeat(m, 4);
         }
         return repeat(m, 3) + "-" + repeat(m, 2) + "-" + digits.substring(digits.length() - 4);
@@ -116,12 +122,11 @@ public enum MaskType {
         char m = config.getDefaultMaskChar();
         String[] parts = value.split("\\s+");
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            if (sb.length() > 0) {
                 sb.append(' ');
             }
-            String part = parts[i];
-            if (part.isEmpty()) continue;
             sb.append(part.charAt(0));
             if (part.length() > 1) {
                 sb.append(repeat(m, part.length() - 1));
@@ -138,7 +143,9 @@ public enum MaskType {
      */
     PASSPORT((value, config) -> {
         char m = config.getDefaultMaskChar();
-        if (value.length() <= 5) {
+        // Fail-closed below 7 chars: keeping 2+3 visible would leave at most
+        // one character actually masked.
+        if (value.length() <= 6) {
             return repeat(m, 4);
         }
         return value.substring(0, 2) + repeat(m, value.length() - 5) + value.substring(value.length() - 3);
@@ -153,7 +160,7 @@ public enum MaskType {
     BANK_ACCOUNT((value, config) -> {
         char m = config.getDefaultMaskChar();
         String digits = value.replaceAll("\\D", "");
-        if (digits.length() <= 4) {
+        if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 4);
         }
         return repeat(m, digits.length() - 4) + digits.substring(digits.length() - 4);
@@ -177,6 +184,28 @@ public enum MaskType {
         // Replace each octet in prefix with 3 mask chars
         String maskedPrefix = prefix.replaceAll("[^.]+", repeat(m, 3));
         return maskedPrefix + "." + lastOctet;
+    }),
+
+    /**
+     * Detects the value format automatically and applies the matching built-in
+     * strategy: payment card (Luhn-validated), email or IBAN, in that order.
+     * Falls back to a total mask when no known format matches, so unknown
+     * values are never leaked.
+     *
+     * @since 1.1.0
+     * @see MaskPatterns
+     */
+    AUTO((value, config) -> {
+        if (MaskPatterns.isCreditCard(value)) {
+            return CREDIT_CARD.getStrategy().mask(value, config);
+        }
+        if (MaskPatterns.isEmail(value)) {
+            return EMAIL.getStrategy().mask(value, config);
+        }
+        if (MaskPatterns.isIban(value)) {
+            return IBAN.getStrategy().mask(value, config);
+        }
+        return repeat(config.getDefaultMaskChar(), 8);
     }),
 
     /**
@@ -205,6 +234,14 @@ public enum MaskType {
      */
     public MaskingStrategy getStrategy() {
         return strategy;
+    }
+
+    /**
+     * Fail-closed guard: a value is fully masked when keeping {@code visible}
+     * characters would reveal at least as much as it hides.
+     */
+    private static boolean exposesTooMuch(int length, int visible) {
+        return length < visible * 2;
     }
 
     /**

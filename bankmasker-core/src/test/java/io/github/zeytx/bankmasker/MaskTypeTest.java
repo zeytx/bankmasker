@@ -27,6 +27,9 @@ class MaskTypeTest {
     @CsvSource({
             "4111111111111111, ****-****-****-1111",
             "4111-1111-1111-5678, ****-****-****-5678",
+            "12345678, ****-****-****-5678",
+            "1234567, ****",
+            "12345, ****",
             "12, ****"
     })
     void creditCard(String input, String expected) {
@@ -39,7 +42,8 @@ class MaskTypeTest {
             "john@mail.com, jo****@mail.com",
             "a@mail.com, ****@mail.com",
             "ab@mail.com, ****@mail.com",
-            "abc@mail.com, ab****@mail.com",
+            "abc@mail.com, a****@mail.com",
+            "abcd@mail.com, ab****@mail.com",
             "ab@evil@real.com, ab****@real.com",
             "@mail.com, ********",
             "notanemail, ********"
@@ -58,6 +62,22 @@ class MaskTypeTest {
     @DisplayName("DNI masks correctly")
     void dni() {
         assertEquals("******3456", MaskType.DNI.getStrategy().mask("ABCD123456"));
+    }
+
+    @ParameterizedTest
+    @DisplayName("last-4 types fully mask values where visible part >= hidden part")
+    @CsvSource({
+            "PHONE, 5551234, ****",
+            "PHONE, 55512345, ****2345",
+            "DNI, ABC1234, ****",
+            "DNI, ABCD1234, ****1234",
+            "BANK_ACCOUNT, 1234567, ****",
+            "SSN, 1234567, ***-**-****",
+            "IBAN, ES66210004, ****",
+            "IBAN, ES6621000418, ES******0418"
+    })
+    void shortValuesFailClosed(MaskType type, String input, String expected) {
+        assertEquals(expected, type.getStrategy().mask(input));
     }
 
     @ParameterizedTest
@@ -104,7 +124,8 @@ class MaskTypeTest {
     @CsvSource({
             "AB1234567, AB****567",
             "X12345678901, X1*******901",
-            "ABCDE, ****"
+            "ABCDE, ****",
+            "ABCDEF, ****"
     })
     void passport(String input, String expected) {
         assertEquals(expected, MaskType.PASSPORT.getStrategy().mask(input));
@@ -136,6 +157,39 @@ class MaskTypeTest {
     @DisplayName("IP_ADDRESS without dots falls back to total mask")
     void ipAddressNoDots() {
         assertEquals("********", MaskType.IP_ADDRESS.getStrategy().mask("noperiod"));
+    }
+
+    // --- AUTO ---
+
+    @ParameterizedTest
+    @DisplayName("AUTO detects the format and applies the matching strategy")
+    @CsvSource({
+            "4111111111111111, ****-****-****-1111",
+            "4111-1111-1111-1111, ****-****-****-1111",
+            "'4111 1111 1111 1111', ****-****-****-1111",
+            "john.doe@mail.com, jo****@mail.com",
+            "ES6621000418401234567891, ES******************7891",
+            "just some text, ********",
+            "1234567890123, ********"
+    })
+    void auto(String input, String expected) {
+        assertEquals(expected, MaskType.AUTO.getStrategy().mask(input));
+    }
+
+    @Test
+    @DisplayName("AUTO respects defaultMaskChar")
+    void autoCustomChar() {
+        MaskingConfig.getInstance().setDefaultMaskChar('#');
+        assertEquals("####-####-####-1111", MaskType.AUTO.getStrategy().mask("4111111111111111"));
+        assertEquals("########", MaskType.AUTO.getStrategy().mask("unknown format"));
+    }
+
+    // --- NAME edge cases ---
+
+    @Test
+    @DisplayName("NAME with leading/trailing whitespace has no stray spaces")
+    void nameLeadingWhitespace() {
+        assertEquals("J*** D**", MaskType.NAME.getStrategy().mask("  John Doe  "));
     }
 
     // --- defaultMaskChar ---
@@ -174,5 +228,13 @@ class MaskTypeTest {
         MaskingConfig.getInstance().setDefaultMaskChar('#');
         assertEquals("###-##-6789", MaskType.SSN.getStrategy().mask("123-45-6789"));
     }
-}
 
+    @ParameterizedTest
+    @DisplayName("defaultMaskChar rejects control characters and surrogates")
+    @CsvSource({"10", "13", "0", "55357"})
+    void rejectsUnsafeMaskChar(int codeUnit) {
+        MaskingConfig config = MaskingConfig.create();
+        assertThrows(IllegalArgumentException.class, () -> config.setDefaultMaskChar((char) codeUnit));
+        assertEquals('*', config.getDefaultMaskChar());
+    }
+}
