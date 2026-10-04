@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Module POMs published to Central linked to `https://github.com/zeytx/bankmasker/<module>` (404): project and SCM URLs are no longer suffixed with the artifactId; SCM connections use valid HTTPS/SSH URLs
+- Release workflow failed after publishing because `central-publishing-maven-plugin` 0.7.0 could not parse the current Central API response; upgraded to 0.11.0
+
 ## [1.1.0] — 2026-10-04
 
 ### Added
