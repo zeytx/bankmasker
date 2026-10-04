@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.zeytx</groupId>
         <artifactId>bankmasker-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>bankmasker-logging</artifactId>
@@ -15,6 +15,10 @@
 
     <name>BankMasker Logging</name>
     <description>Logback and Log4j2 pattern converters that mask sensitive data (PAN, emails, IBAN) in log messages</description>
+
+    <properties>
+        <module.name>io.github.zeytx.bankmasker.logging</module.name>
+    </properties>
 
     <dependencies>
         <dependency>

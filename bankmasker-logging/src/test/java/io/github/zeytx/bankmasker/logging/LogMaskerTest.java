@@ -6,7 +6,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 @DisplayName("LogMasker — pattern masking in free text")
 class LogMaskerTest {
@@ -55,6 +58,34 @@ class LogMaskerTest {
     }
 
     @Test
+    @DisplayName("masks an IBAN printed in groups of 4")
+    void masksSpacedIban() {
+        assertThat(LogMasker.maskMessage("transfer to ES66 2100 0418 4012 3456 7891 done"))
+                .isEqualTo("transfer to ES******************7891 done");
+    }
+
+    @Test
+    @DisplayName("leaves short IBAN-like tokens untouched")
+    void leavesIbanLookalikes() {
+        String msg = "ref ID12 3456 7890 processed";
+        assertThat(LogMasker.maskMessage(msg)).isEqualTo(msg);
+    }
+
+    @Test
+    @DisplayName("masks an SSN inside a message")
+    void masksSsn() {
+        assertThat(LogMasker.maskMessage("applicant ssn 123-45-6789 verified"))
+                .isEqualTo("applicant ssn ***-**-6789 verified");
+    }
+
+    @Test
+    @DisplayName("leaves dates untouched by SSN detection")
+    void leavesDates() {
+        String msg = "created on 2026-07-02 at noon";
+        assertThat(LogMasker.maskMessage(msg)).isEqualTo(msg);
+    }
+
+    @Test
     @DisplayName("masks multiple patterns in the same message")
     void masksMixedMessage() {
         String masked = LogMasker.maskMessage(
@@ -95,5 +126,20 @@ class LogMaskerTest {
     void plainMessageUnchanged() {
         String msg = "application started in 2.3 seconds";
         assertThat(LogMasker.maskMessage(msg)).isEqualTo(msg);
+    }
+
+    @Test
+    @DisplayName("masks emails delimited by punctuation")
+    void masksDelimitedEmail() {
+        assertThat(LogMasker.maskMessage("to=<john.doe@mail.com>, cc:jane.roe@mail.com"))
+                .isEqualTo("to=<jo****@mail.com>, cc:ja****@mail.com");
+    }
+
+    @Test
+    @DisplayName("long tokens without '@' are processed in linear time (no ReDoS)")
+    void noCatastrophicBacktracking() {
+        String hostile = "a".repeat(200_000);
+        String result = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> LogMasker.maskMessage(hostile));
+        assertThat(result).isEqualTo(hostile);
     }
 }
