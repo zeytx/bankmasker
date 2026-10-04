@@ -1,10 +1,14 @@
 package io.github.zeytx.bankmasker.spring;
 
 import io.github.zeytx.bankmasker.MaskingConfig;
+import io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger;
 import org.junit.jupiter.api.DisplayName;
+import org.slf4j.event.Level;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -59,6 +63,30 @@ class BankMaskerAutoConfigurationTest {
     }
 
     @Test
+    @DisplayName("applies audit level from properties")
+    void appliesAuditLevel() {
+        runner.withPropertyValues("bankmasker.audit.enabled=true", "bankmasker.audit.level=debug")
+                .run(context -> {
+                    MaskingConfig config = context.getBean(MaskingConfig.class);
+                    assertThat(config.getAuditLogger())
+                            .isInstanceOfSatisfying(Slf4jMaskingAuditLogger.class,
+                                    logger -> assertThat(logger.getLevel()).isEqualTo(Level.DEBUG));
+                });
+    }
+
+    @Test
+    @DisplayName("invalid audit level falls back to INFO")
+    void invalidAuditLevelFallsBack() {
+        runner.withPropertyValues("bankmasker.audit.enabled=true", "bankmasker.audit.level=nope")
+                .run(context -> {
+                    MaskingConfig config = context.getBean(MaskingConfig.class);
+                    assertThat(config.getAuditLogger())
+                            .isInstanceOfSatisfying(Slf4jMaskingAuditLogger.class,
+                                    logger -> assertThat(logger.getLevel()).isEqualTo(Level.INFO));
+                });
+    }
+
+    @Test
     @DisplayName("audit logger is null when audit.enabled=false")
     void auditLoggerDisabledByDefault() {
         runner.run(context -> {
@@ -66,5 +94,34 @@ class BankMaskerAutoConfigurationTest {
             assertThat(config.getAuditLogger()).isNull();
         });
     }
-}
 
+    @Configuration(proxyBeanMethods = false)
+    static class CustomConfig {
+        static final MaskingConfig CUSTOM = MaskingConfig.create().setDefaultMaskChar('#');
+
+        @Bean
+        MaskingConfig customMaskingConfig() {
+            return CUSTOM;
+        }
+    }
+
+    @Test
+    @DisplayName("backs off when the application defines its own MaskingConfig")
+    void backsOffForUserBean() {
+        runner.withUserConfiguration(CustomConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(MaskingConfig.class);
+                    assertThat(context.getBean(MaskingConfig.class)).isSameAs(CustomConfig.CUSTOM);
+                });
+    }
+
+    @Test
+    @DisplayName("fails fast on a control character as mask char")
+    void rejectsControlMaskChar() {
+        runner.withPropertyValues("bankmasker.default-mask-char=\u0085")
+                .run(context -> assertThat(context).getFailure()
+                        .rootCause()
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("Invalid mask character"));
+    }
+}
