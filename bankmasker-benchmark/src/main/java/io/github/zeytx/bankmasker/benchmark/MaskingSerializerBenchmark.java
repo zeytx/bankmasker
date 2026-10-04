@@ -106,6 +106,18 @@ public class MaskingSerializerBenchmark {
         });
     }
 
+    @Benchmark
+    public String serializeAutoDetection() throws Exception {
+        return mapper.writeValueAsString(new Object() {
+            @MaskData(MaskType.AUTO)
+            public final String card = "4111111111111111";
+            @MaskData(MaskType.AUTO)
+            public final String email = "john.doe@example.com";
+            @MaskData(MaskType.AUTO)
+            public final String unknown = "free-form text value";
+        });
+    }
+
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
                 .include(MaskingSerializerBenchmark.class.getSimpleName())
