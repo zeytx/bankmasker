@@ -1,5 +1,6 @@
 package io.github.zeytx.bankmasker;
 
+import java.util.function.IntPredicate;
 import java.util.regex.Pattern;
 
 /**
@@ -38,7 +39,7 @@ public final class MaskPatterns {
         if (value == null || !CARD_CHARS.matcher(value).matches()) {
             return false;
         }
-        String digits = value.replaceAll("[ -]", "");
+        String digits = filter(value, c -> c != ' ' && c != '-');
         return digits.length() >= 13 && digits.length() <= 19 && passesLuhn(digits);
     }
 
@@ -63,7 +64,7 @@ public final class MaskPatterns {
         if (value == null) {
             return false;
         }
-        return IBAN.matcher(value.replaceAll("\\s", "")).matches();
+        return IBAN.matcher(withoutWhitespace(value)).matches();
     }
 
     /**
@@ -94,5 +95,28 @@ public final class MaskPatterns {
             doubleIt = !doubleIt;
         }
         return sum % 10 == 0;
+    }
+
+    // Char filters used on every masked value: same result as replaceAll("\\D", "")
+    // and replaceAll("\\s", "") without compiling a regex per call.
+
+    static String digitsOnly(String value) {
+        return filter(value, c -> c >= '0' && c <= '9');
+    }
+
+    static String withoutWhitespace(String value) {
+        // \s: space, \t, \n, \x0B, \f, \r
+        return filter(value, c -> c != ' ' && (c < 0x09 || c > 0x0D));
+    }
+
+    private static String filter(String value, IntPredicate keep) {
+        StringBuilder sb = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (keep.test(c)) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 }

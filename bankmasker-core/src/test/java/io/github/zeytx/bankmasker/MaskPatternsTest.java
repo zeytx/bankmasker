@@ -10,6 +10,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MaskPatternsTest {
 
     @ParameterizedTest
+    @DisplayName("char filters match the regex they replace")
+    @ValueSource(strings = {
+            "4111-1111 1111\t1111",
+            "+52 (55) 1234-5678",
+            "ES66 2100\n0418\u000B4012\f3456\r7891",
+            "١٢٣abc x",   // non-ASCII digits and NBSP are not \d / \s
+            ""
+    })
+    void filtersMatchRegex(String value) {
+        assertThat(MaskPatterns.digitsOnly(value)).isEqualTo(value.replaceAll("\\D", ""));
+        assertThat(MaskPatterns.withoutWhitespace(value)).isEqualTo(value.replaceAll("\\s", ""));
+    }
+
+    @ParameterizedTest
     @DisplayName("detects valid card numbers (13-19 digits, Luhn)")
     @ValueSource(strings = {
             "4111111111111111",      // Visa 16

@@ -37,7 +37,7 @@ public enum MaskType {
      */
     CREDIT_CARD((value, config) -> {
         char m = config.getDefaultMaskChar();
-        String digits = value.replaceAll("\\D", "");
+        String digits = MaskPatterns.digitsOnly(value);
         if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 4);
         }
@@ -68,7 +68,7 @@ public enum MaskType {
      */
     PHONE((value, config) -> {
         char m = config.getDefaultMaskChar();
-        String digits = value.replaceAll("\\D", "");
+        String digits = MaskPatterns.digitsOnly(value);
         if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 4);
         }
@@ -92,7 +92,7 @@ public enum MaskType {
      */
     IBAN((value, config) -> {
         char m = config.getDefaultMaskChar();
-        String clean = value.replaceAll("\\s", "");
+        String clean = MaskPatterns.withoutWhitespace(value);
         if (exposesTooMuch(clean.length(), 6)) {
             return repeat(m, 4);
         }
@@ -107,7 +107,7 @@ public enum MaskType {
      */
     SSN((value, config) -> {
         char m = config.getDefaultMaskChar();
-        String digits = value.replaceAll("\\D", "");
+        String digits = MaskPatterns.digitsOnly(value);
         if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 3) + "-" + repeat(m, 2) + "-" + repeat(m, 4);
         }
@@ -159,7 +159,7 @@ public enum MaskType {
      */
     BANK_ACCOUNT((value, config) -> {
         char m = config.getDefaultMaskChar();
-        String digits = value.replaceAll("\\D", "");
+        String digits = MaskPatterns.digitsOnly(value);
         if (exposesTooMuch(digits.length(), 4)) {
             return repeat(m, 4);
         }
