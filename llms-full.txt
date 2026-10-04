@@ -9,6 +9,14 @@ Use this to generate code that integrates BankMasker correctly.
 
 ---
 
+## Compatibility (important)
+
+`@MaskData` works with Jackson 2 (`com.fasterxml.jackson`) only. Jackson 3 (`tools.jackson`),
+the Spring Boot 4 default for HTTP message conversion, does not recognize the Jackson 2
+`@JsonSerialize` meta-annotation and serializes annotated values **in clear text**. On Spring
+Boot 4, serialize sensitive DTOs with a Jackson 2 `ObjectMapper`. The starter logs a WARN at
+startup when Jackson 3 is on the classpath. Jackson 3 support is planned for 1.2.0.
+
 ## Installation
 
 Maven (core only):
@@ -16,7 +24,7 @@ Maven (core only):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 
@@ -25,18 +33,18 @@ Maven (Spring Boot — includes core):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 
 Gradle (core only):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-core:1.1.0'
+implementation 'io.github.zeytx:bankmasker-core:1.1.1'
 ```
 
 Gradle (Spring Boot):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.0'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.1'
 ```
 
 ---
@@ -232,7 +240,7 @@ Maven:
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-logging</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 

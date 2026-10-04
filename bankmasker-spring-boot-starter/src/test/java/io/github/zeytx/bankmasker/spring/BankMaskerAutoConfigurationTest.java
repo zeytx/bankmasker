@@ -5,8 +5,12 @@ import io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger;
 import org.junit.jupiter.api.DisplayName;
 import org.slf4j.event.Level;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -123,5 +127,26 @@ class BankMaskerAutoConfigurationTest {
                         .rootCause()
                         .isInstanceOf(IllegalArgumentException.class)
                         .hasMessageContaining("Invalid mask character"));
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    @DisplayName("warns that @MaskData is ignored when Jackson 3 is on the classpath")
+    void warnsWhenJackson3Present(CapturedOutput output) {
+        runner.run(context -> {
+            assertThat(context).hasSingleBean(BankMaskerAutoConfiguration.Jackson3Warning.class);
+            assertThat(output).contains("Jackson 3 (tools.jackson) detected");
+        });
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    @DisplayName("no Jackson 3 warning when only Jackson 2 is present")
+    void noWarningWithoutJackson3(CapturedOutput output) {
+        runner.withClassLoader(new FilteredClassLoader("tools.jackson"))
+                .run(context -> {
+                    assertThat(context).doesNotHaveBean(BankMaskerAutoConfiguration.Jackson3Warning.class);
+                    assertThat(output).doesNotContain("Jackson 3 (tools.jackson) detected");
+                });
     }
 }
