@@ -21,8 +21,14 @@
     </properties>
 
     <dependencies>
+        <!-- Users bring Jackson 2 and/or Jackson 3; both are supported -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <scope>provided</scope>
         </dependency>

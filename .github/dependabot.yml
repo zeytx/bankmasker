@@ -10,6 +10,11 @@ updates:
     groups:
       maven-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # The starter is built against the oldest supported Spring Boot line;
+      # Spring Boot 4 is covered by the CI job using -Pspring-boot-4
+      - dependency-name: "org.springframework.boot:*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

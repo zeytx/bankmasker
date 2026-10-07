@@ -11,7 +11,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * Auto-configuration for BankMasker.
@@ -22,9 +21,8 @@ import org.springframework.context.annotation.Configuration;
  * <p>This configuration is activated when {@link MaskingSerializer} is on the classpath.
  * Declaring your own {@link MaskingConfig} bean disables it.
  *
- * <p>BankMasker masks through Jackson 2. When Jackson 3 ({@code tools.jackson})
- * is on the classpath, as with Spring Boot 4 defaults, a warning is logged:
- * Jackson 3 mappers ignore {@link io.github.zeytx.bankmasker.MaskData}.
+ * <p>The configured {@link MaskingConfig} applies to both Jackson 2 and
+ * Jackson 3 mappers, so it covers Spring Boot 3 and Spring Boot 4 defaults.
  *
  * @since 1.0.0
  */
@@ -69,22 +67,6 @@ public class BankMaskerAutoConfiguration {
         } catch (IllegalArgumentException | NullPointerException e) {
             log.warn("[BankMasker] Invalid audit level '{}', falling back to INFO", level);
             return Level.INFO;
-        }
-    }
-
-    /**
-     * Warns at startup when Jackson 3 is on the classpath: its mappers ignore
-     * {@code @MaskData}, so values they serialize are written in clear text.
-     */
-    @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(name = "tools.jackson.databind.ObjectMapper")
-    static class Jackson3Warning {
-
-        Jackson3Warning() {
-            log.warn("[BankMasker] Jackson 3 (tools.jackson) detected. @MaskData only applies to Jackson 2 "
-                    + "ObjectMappers: values serialized with Jackson 3 (the Spring Boot 4 default for HTTP "
-                    + "responses) are NOT masked. Serialize sensitive DTOs with Jackson 2 until Jackson 3 "
-                    + "is supported.");
         }
     }
 }

@@ -26,8 +26,8 @@ sensitive value than documented** is treated as a security issue, for example:
 
 ## Scope and limitations
 
-- Only **Jackson 2** applies `@MaskData`. Jackson 3 (`tools.jackson`, the
-  Spring Boot 4 default) ignores it and serializes the value in clear text.
+- `@MaskData` is applied by Jackson 2 and Jackson 3 only. Other serializers
+  (Gson, JSON-B, `toString()`) write annotated fields in clear text.
 - Masking happens **only at serialization/formatting time**. Values remain in
   clear text in memory, in your database and in any `toString()` you write.
 - `bankmasker.enabled=false` / `MaskingConfig.setEnabled(false)` disables
