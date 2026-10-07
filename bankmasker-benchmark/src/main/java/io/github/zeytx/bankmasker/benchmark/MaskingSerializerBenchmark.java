@@ -8,6 +8,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.concurrent.TimeUnit;
 
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class MaskingSerializerBenchmark {
 
     private ObjectMapper mapper;
+    private JsonMapper jackson3Mapper;
     private MaskedDTO maskedDto;
     private PlainDTO plainDto;
 
@@ -84,6 +86,7 @@ public class MaskingSerializerBenchmark {
     @Setup
     public void setup() {
         mapper = new ObjectMapper();
+        jackson3Mapper = JsonMapper.builder().build();
         maskedDto = new MaskedDTO();
         plainDto = new PlainDTO();
     }
@@ -96,6 +99,16 @@ public class MaskingSerializerBenchmark {
     @Benchmark
     public String serializeWithoutMasking() throws Exception {
         return mapper.writeValueAsString(plainDto);
+    }
+
+    @Benchmark
+    public String serializeWithMaskingJackson3() {
+        return jackson3Mapper.writeValueAsString(maskedDto);
+    }
+
+    @Benchmark
+    public String serializeWithoutMaskingJackson3() {
+        return jackson3Mapper.writeValueAsString(plainDto);
     }
 
     @Benchmark
