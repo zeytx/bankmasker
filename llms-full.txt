@@ -9,13 +9,17 @@ Use this to generate code that integrates BankMasker correctly.
 
 ---
 
-## Compatibility (important)
+## Compatibility
 
-`@MaskData` works with Jackson 2 (`com.fasterxml.jackson`) only. Jackson 3 (`tools.jackson`),
-the Spring Boot 4 default for HTTP message conversion, does not recognize the Jackson 2
-`@JsonSerialize` meta-annotation and serializes annotated values **in clear text**. On Spring
-Boot 4, serialize sensitive DTOs with a Jackson 2 `ObjectMapper`. The starter logs a WARN at
-startup when Jackson 3 is on the classpath. Jackson 3 support is planned for 1.2.0.
+`@MaskData` works with both Jackson 2 (`com.fasterxml.jackson`, Spring Boot 3) and Jackson 3
+(`tools.jackson`, Spring Boot 4) with no module or configuration. The annotation carries both
+`@com.fasterxml.jackson.databind.annotation.JsonSerialize(using = MaskingSerializer.class)` and
+`@tools.jackson.databind.annotation.JsonSerialize(using = Jackson3MaskingSerializer.class)`;
+each Jackson version reads its own and the JVM ignores the one whose classes are absent.
+Both Jackson versions are `provided` dependencies: bring the one(s) you use.
+
+With `-Xlint:all -Werror` and a single Jackson version, javac warns about the other version's
+missing annotation (`[classfile]`); add `-Xlint:-classfile`.
 
 ## Installation
 
@@ -24,7 +28,7 @@ Maven (core only):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -33,18 +37,18 @@ Maven (Spring Boot — includes core):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
 Gradle (core only):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-core:1.1.1'
+implementation 'io.github.zeytx:bankmasker-core:1.2.0'
 ```
 
 Gradle (Spring Boot):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.1'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.2.0'
 ```
 
 ---
@@ -178,6 +182,26 @@ mapper.registerModule(new MaskingModule(tenantConfig));
 // This mapper uses '#', other mappers keep using global config '*'
 ```
 
+## Complete Source: Jackson3MaskingModule.java (per-mapper config, Jackson 3)
+
+```java
+package io.github.zeytx.bankmasker;
+
+import tools.jackson.databind.JacksonModule;
+
+public class Jackson3MaskingModule extends JacksonModule {   // since 1.2.0
+    public Jackson3MaskingModule(MaskingConfig config);    // throws IllegalArgumentException if null
+    public MaskingConfig getConfig();
+}
+```
+
+Usage (Jackson 3 mappers are immutable — register on the builder):
+```java
+JsonMapper mapper = JsonMapper.builder()
+    .addModule(new Jackson3MaskingModule(MaskingConfig.create().setDefaultMaskChar('#')))
+    .build();
+```
+
 ## Complete Source: MaskingStrategy.java (custom strategy interface)
 
 ```java
@@ -240,7 +264,7 @@ Maven:
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-logging</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 

@@ -4,12 +4,12 @@
 
 BankMasker is the simplest way to mask sensitive fields in Java. Just annotate a String field with `@MaskData` and Jackson automatically masks it. No config needed.
 
-## Compatibility (important)
+## Compatibility
 
-@MaskData works with Jackson 2 (com.fasterxml.jackson) only. Jackson 3 (tools.jackson) — the
-Spring Boot 4 default for HTTP responses — ignores it and writes values in clear text. On Spring
-Boot 4, serialize sensitive DTOs with a Jackson 2 ObjectMapper. The starter logs a WARN when it
-detects Jackson 3.
+@MaskData works with Jackson 2 (com.fasterxml.jackson, Spring Boot 3) and Jackson 3
+(tools.jackson, Spring Boot 4) with no module or configuration. For per-mapper config use
+MaskingModule (Jackson 2: mapper.registerModule) or Jackson3MaskingModule (Jackson 3:
+JsonMapper.builder().addModule(...).build()).
 
 ## Quick Start
 
@@ -18,13 +18,13 @@ Add dependency (Maven):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
 Add dependency (Gradle):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-core:1.1.1'
+implementation 'io.github.zeytx:bankmasker-core:1.2.0'
 ```
 
 Spring Boot (includes core):
@@ -32,7 +32,7 @@ Spring Boot (includes core):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -189,7 +189,7 @@ and SSNs from free-text log messages.
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-logging</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 

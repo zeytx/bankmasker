@@ -33,7 +33,7 @@
 
 <div class="badges">
     <img src="https://img.shields.io/badge/Java-17+-orange" alt="Java 17+">
-    <img src="https://img.shields.io/badge/Jackson-2.18-blue" alt="Jackson 2.18">
+    <img src="https://img.shields.io/badge/Jackson-2.x_|_3.x-blue" alt="Jackson 2.x and 3.x">
     <img src="https://img.shields.io/badge/Spring_Boot-3.4-green" alt="Spring Boot 3.4">
     <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License">
 </div>
@@ -41,7 +41,7 @@
 <div class="grid">
     <div class="card">
         <h3>⚡ Zero Config</h3>
-        <p>Just add <code>@MaskData</code> to your fields. Works instantly with any Jackson ObjectMapper.</p>
+        <p>Just add <code>@MaskData</code> to your fields. Works instantly with Jackson 2 and Jackson 3 (Spring Boot 3 and 4).</p>
     </div>
     <div class="card">
         <h3>🔒 13 Built-in Masks</h3>
@@ -75,14 +75,14 @@
 <pre><code>&lt;dependency&gt;
     &lt;groupId&gt;io.github.zeytx&lt;/groupId&gt;
     &lt;artifactId&gt;bankmasker-core&lt;/artifactId&gt;
-    &lt;version&gt;1.1.1&lt;/version&gt;
+    &lt;version&gt;1.2.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
 <p>For Spring Boot projects:</p>
 <pre><code>&lt;dependency&gt;
     &lt;groupId&gt;io.github.zeytx&lt;/groupId&gt;
     &lt;artifactId&gt;bankmasker-spring-boot-starter&lt;/artifactId&gt;
-    &lt;version&gt;1.1.1&lt;/version&gt;
+    &lt;version&gt;1.2.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
 <h3>2. Annotate your DTOs</h3>

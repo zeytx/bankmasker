@@ -3,17 +3,16 @@
 > Lightweight Java library for masking sensitive data during JSON serialization — and beyond.
 
 [![Java](https://img.shields.io/badge/Java-17+-orange)](https://openjdk.org/)
-[![Jackson](https://img.shields.io/badge/Jackson-2.x_only-blue)](https://github.com/FasterXML/jackson)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-green)](https://spring.io/projects/spring-boot)
+[![Jackson](https://img.shields.io/badge/Jackson-2.x_|_3.x-blue)](https://github.com/FasterXML/jackson)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x_|_4.x-green)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
 [![CI](https://github.com/zeytx/bankmasker/actions/workflows/ci.yml/badge.svg)](https://github.com/zeytx/bankmasker/actions)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.zeytx/bankmasker-core)](https://central.sonatype.com/artifact/io.github.zeytx/bankmasker-core)
 
-> ⚠️ **Jackson 2 only.** `@MaskData` is applied by Jackson 2 (`com.fasterxml.jackson`). Jackson 3 (`tools.jackson`) ignores it and writes the value **in clear text** — and Spring Boot 4 serializes HTTP responses with Jackson 3 by default. On Spring Boot 4, serialize sensitive DTOs with a Jackson 2 `ObjectMapper` until Jackson 3 support lands (planned for 1.2.0). The starter logs a `WARN` at startup when it detects Jackson 3.
-
 ## ✨ Features
 
 - **Zero configuration** — just annotate your fields with `@MaskData`
+- **Jackson 2 and Jackson 3** — the same annotation works with `com.fasterxml.jackson` and `tools.jackson` (Spring Boot 3 and 4)
 - **13 built-in mask types** — credit cards, emails, phones, IBANs, SSNs, names, passports, bank accounts, IPs, auto-detection, and more
 - **Custom masking** — configurable mask character, visible start/end
 - **`MaskUtils`** — use masking in `toString()`, logs, or anywhere
@@ -21,7 +20,7 @@
 - **Fail-closed** — short values, unknown formats and arbitrary objects are fully masked, never partially leaked
 - **Java records support** — works with records, classes, and methods
 - **Spring Boot Starter** — auto-configuration via `application.yml`
-- **Per-ObjectMapper config** — `MaskingModule` for multi-tenant / parallel-test scenarios
+- **Per-ObjectMapper config** — `MaskingModule` (Jackson 2) / `Jackson3MaskingModule` (Jackson 3) for multi-tenant / parallel-test scenarios
 - **Audit logging** — track masked field access (SLF4J or custom)
 - **Global config** — enable/disable at runtime, customizable mask character
 - **JMH benchmarks** — proven performance
@@ -45,14 +44,14 @@
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 
 <!-- Spring Boot (includes core automatically) -->
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -60,10 +59,10 @@
 
 ```groovy
 // Core only (any Java project)
-implementation 'io.github.zeytx:bankmasker-core:1.1.1'
+implementation 'io.github.zeytx:bankmasker-core:1.2.0'
 
 // Spring Boot (includes core automatically)
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.1.1'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.2.0'
 ```
 
 ### Annotate your DTO fields
@@ -252,6 +251,20 @@ mapper.registerModule(new MaskingModule(tenantConfig));
 // This mapper uses '#' while others keep using '*'
 ```
 
+With Jackson 3 the mapper is immutable, so register the module on the builder:
+
+```java
+JsonMapper mapper = JsonMapper.builder()
+    .addModule(new Jackson3MaskingModule(tenantConfig))
+    .build();
+```
+
+## 🧩 Jackson 2 & Jackson 3
+
+`@MaskData` works with **Jackson 2** (`com.fasterxml.jackson`, Spring Boot 3) and **Jackson 3** (`tools.jackson`, Spring Boot 4) with no extra setup: it carries the `@JsonSerialize` of both versions, and each Jackson picks up its own. Have either one (or both) on the classpath.
+
+If you compile with `-Xlint:all -Werror` and only one Jackson version, javac reports the other version's missing annotation (`[classfile] Cannot find annotation method 'using()'`); add `-Xlint:-classfile`. The default javac settings print nothing.
+
 ## ☕ Java Records
 
 `@MaskData` works on Java records out of the box:
@@ -311,10 +324,11 @@ Reference results (JDK 25, AMD Ryzen 7 5800XT, 1 fork, 5 × 2 s iterations; high
 
 | Benchmark | Throughput | Per op |
 |---|---|---|
-| DTO with 11 fields, none masked (baseline) | 2,364 ops/ms | 0.42 µs |
-| Same DTO, 10 fields masked | 588 ops/ms | 1.70 µs |
-| Single `CREDIT_CARD` field | 4,357 ops/ms | 0.23 µs |
-| `AUTO` detection | 747 ops/ms | 1.34 µs |
+| DTO with 11 fields, none masked (baseline) | 2,462 ops/ms | 0.41 µs |
+| Same DTO, 10 fields masked | 647 ops/ms | 1.55 µs |
+| Same DTO, 10 fields masked — Jackson 3 | 649 ops/ms | 1.54 µs |
+| Single `CREDIT_CARD` field | 4,866 ops/ms | 0.21 µs |
+| `AUTO` detection | 822 ops/ms | 1.22 µs |
 | `LogMasker` — clean message (no match) | 341 ops/ms | 2.9 µs |
 | `LogMasker` — PAN in message | 289 ops/ms | 3.5 µs |
 | `LogMasker` — PAN + email + IBAN | 194 ops/ms | 5.2 µs |
@@ -338,11 +352,14 @@ bankmasker/
 │   └── src/main/java/.../bankmasker/
 │       ├── MaskData.java                ← @MaskData annotation
 │       ├── MaskType.java                ← Built-in mask types (13)
-│       ├── MaskingSerializer.java       ← Jackson serializer
+│       ├── MaskingSerializer.java       ← Jackson 2 serializer
+│       ├── Jackson3MaskingSerializer.java ← Jackson 3 serializer
+│       ├── MaskingSupport.java          ← Shared masking logic (no Jackson types)
 │       ├── MaskingStrategy.java         ← Strategy interface
 │       ├── MaskUtils.java              ← Programmatic masking
 │       ├── MaskingConfig.java          ← Global + per-mapper config
-│       ├── MaskingModule.java          ← Per-ObjectMapper module
+│       ├── MaskingModule.java          ← Per-ObjectMapper module (Jackson 2)
+│       ├── Jackson3MaskingModule.java  ← Per-mapper module (Jackson 3)
 │       ├── MaskPatterns.java           ← Format detection (card/email/IBAN)
 │       ├── MaskingAuditLogger.java     ← Audit interface
 │       └── Slf4jMaskingAuditLogger.java ← SLF4J audit impl

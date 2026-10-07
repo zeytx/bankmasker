@@ -11,6 +11,8 @@ When a user needs to:
 
 ## How to use BankMasker
 
+Works with Jackson 2 (`com.fasterxml.jackson`, Spring Boot 3) and Jackson 3 (`tools.jackson`, Spring Boot 4) with no extra setup.
+
 1. **Annotate String fields** with `@MaskData(MaskType.XXX)` — Jackson handles the rest automatically
 2. **For programmatic masking** (logs, toString), use `MaskUtils.mask(value, MaskType.XXX)`
 3. **For log messages and stack traces**, add `bankmasker-logging` and use `%maskedMsg` + `%maskedEx` in the Logback/Log4j2 pattern

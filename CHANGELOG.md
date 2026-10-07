@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-10-06
+
+### Added
+- **Jackson 3 (`tools.jackson`) support, Spring Boot 4 included.** `@MaskData` now works with Jackson 2 and Jackson 3 with no module or configuration: the annotation carries both versions' `@JsonSerialize`, and each Jackson reads its own (the JVM ignores the one whose classes are absent). Both are `provided` dependencies
+- `Jackson3MaskingSerializer` and `Jackson3MaskingModule` (per-mapper config on `JsonMapper.builder()`)
+- CI job testing the starter against Spring Boot 4 (`-Pspring-boot-4`); the starter is still built against Spring Boot 3.x, the oldest supported line
+- Jackson 3 JMH benchmarks
+
+### Changed
+- The starter no longer warns about Jackson 3: the configured `MaskingConfig` applies to Jackson 2 and Jackson 3 mappers
+- Masking logic moved to an internal, Jackson-independent `MaskingSupport` shared by both serializers; Jackson 3 output is verified to match Jackson 2 for every supported field type and configuration
+
+### Notes
+- With `-Xlint:all -Werror` and a single Jackson version on the classpath, javac reports the other version's missing annotation (`[classfile]` lint); add `-Xlint:-classfile`. Default javac settings print nothing
+
 ## [1.1.1] — 2026-10-04
 
 ### Security
