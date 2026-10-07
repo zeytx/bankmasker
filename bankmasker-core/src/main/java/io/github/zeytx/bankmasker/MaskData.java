@@ -12,6 +12,12 @@ import java.lang.annotation.Target;
 /**
  * Marks a field to be masked during JSON serialization.
  *
+ * <p>Works with both Jackson 2 ({@code com.fasterxml.jackson}) and Jackson 3
+ * ({@code tools.jackson}) with no module or configuration: each version picks
+ * up its own {@code @JsonSerialize} meta-annotation ({@link MaskingSerializer}
+ * or {@link Jackson3MaskingSerializer}) and ignores the other one, which may be
+ * absent from the classpath.
+ *
  * <p>Usage:
  * <pre>{@code
  * public class UserDTO {
@@ -42,6 +48,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.RECORD_COMPONENT})
 @JacksonAnnotationsInside
 @JsonSerialize(using = MaskingSerializer.class)
+@tools.jackson.databind.annotation.JsonSerialize(using = Jackson3MaskingSerializer.class)
 public @interface MaskData {
 
     /**

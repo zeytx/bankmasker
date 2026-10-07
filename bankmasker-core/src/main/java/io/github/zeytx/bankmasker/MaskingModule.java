@@ -6,7 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 
 /**
- * Jackson module that allows per-{@link ObjectMapper} masking configuration.
+ * Jackson 2 module that allows per-{@link ObjectMapper} masking configuration.
+ * For Jackson 3 use {@link Jackson3MaskingModule}.
  *
  * <p>Register this module to override the global {@link MaskingConfig} singleton
  * for a specific ObjectMapper instance. This is useful in multi-tenant applications
@@ -30,11 +31,6 @@ import com.fasterxml.jackson.databind.SerializerProvider;
  * @see MaskingSerializer
  */
 public class MaskingModule extends Module {
-
-    /**
-     * Attribute key for per-mapper config stored in Jackson's context attributes.
-     */
-    static final Object CONFIG_KEY = MaskingModule.class.getName() + ".config";
 
     private final MaskingConfig config;
 
@@ -69,7 +65,7 @@ public class MaskingModule extends Module {
         Object owner = context.getOwner();
         if (owner instanceof ObjectMapper mapper) {
             mapper.setDefaultAttributes(mapper.getSerializationConfig().getAttributes()
-                    .withSharedAttribute(CONFIG_KEY, config));
+                    .withSharedAttribute(MaskingSupport.CONFIG_KEY, config));
         }
     }
 
@@ -90,13 +86,7 @@ public class MaskingModule extends Module {
      * @return the resolved config
      */
     static MaskingConfig resolveConfig(SerializerProvider provider) {
-        if (provider != null) {
-            Object attr = provider.getAttribute(CONFIG_KEY);
-            if (attr instanceof MaskingConfig perMapper) {
-                return perMapper;
-            }
-        }
-        return MaskingConfig.getInstance();
+        return MaskingSupport.configOrGlobal(provider == null ? null : provider.getAttribute(MaskingSupport.CONFIG_KEY));
     }
 }
 
