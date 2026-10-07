@@ -1,16 +1,14 @@
 package io.github.zeytx.bankmasker.spring;
 
+import io.github.zeytx.bankmasker.MaskData;
+import io.github.zeytx.bankmasker.MaskType;
 import io.github.zeytx.bankmasker.MaskingConfig;
 import io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger;
 import org.junit.jupiter.api.DisplayName;
 import org.slf4j.event.Level;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -129,24 +127,21 @@ class BankMaskerAutoConfigurationTest {
                         .hasMessageContaining("Invalid mask character"));
     }
 
-    @Test
-    @ExtendWith(OutputCaptureExtension.class)
-    @DisplayName("warns that @MaskData is ignored when Jackson 3 is on the classpath")
-    void warnsWhenJackson3Present(CapturedOutput output) {
-        runner.run(context -> {
-            assertThat(context).hasSingleBean(BankMaskerAutoConfiguration.Jackson3Warning.class);
-            assertThat(output).contains("Jackson 3 (tools.jackson) detected");
-        });
+    static class CardDto {
+        @MaskData(MaskType.CREDIT_CARD)
+        public String card = "4111111111111111";
     }
 
     @Test
-    @ExtendWith(OutputCaptureExtension.class)
-    @DisplayName("no Jackson 3 warning when only Jackson 2 is present")
-    void noWarningWithoutJackson3(CapturedOutput output) {
-        runner.withClassLoader(new FilteredClassLoader("tools.jackson"))
+    @DisplayName("Jackson 2 and Jackson 3 mappers both apply the configured mask char")
+    void bothJacksonVersionsUseProperties() {
+        runner.withPropertyValues("bankmasker.default-mask-char=#")
                 .run(context -> {
-                    assertThat(context).doesNotHaveBean(BankMaskerAutoConfiguration.Jackson3Warning.class);
-                    assertThat(output).doesNotContain("Jackson 3 (tools.jackson) detected");
+                    String expected = "{\"card\":\"####-####-####-1111\"}";
+                    assertThat(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(new CardDto()))
+                            .isEqualTo(expected);
+                    assertThat(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(new CardDto()))
+                            .isEqualTo(expected);
                 });
     }
 }
