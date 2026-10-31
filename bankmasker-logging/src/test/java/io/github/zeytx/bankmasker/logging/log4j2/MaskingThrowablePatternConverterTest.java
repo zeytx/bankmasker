@@ -50,6 +50,18 @@ class MaskingThrowablePatternConverterTest {
     }
 
     @Test
+    @DisplayName("detector options are split from the %ex options")
+    void detectorOptions() {
+        MaskingThrowablePatternConverter converter =
+                MaskingThrowablePatternConverter.newInstance(null, new String[]{"short", "+PHONE"});
+        StringBuilder sb = new StringBuilder();
+        converter.format(event(new IllegalStateException("call +52 55 1234 5678")), sb);
+
+        assertThat(sb.toString()).contains("call ********5678").doesNotContain("1234 5678");
+        assertThat(sb.toString().lines().filter(line -> line.trim().startsWith("at ")).count()).isLessThanOrEqualTo(1);
+    }
+
+    @Test
     @DisplayName("declares that it handles the throwable")
     void handlesThrowable() {
         assertThat(MaskingThrowablePatternConverter.newInstance(null, null).handlesThrowable()).isTrue();
