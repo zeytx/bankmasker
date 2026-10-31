@@ -172,5 +172,62 @@ class MaskUtilsTest {
         MaskingConfig.getInstance().setDefaultMaskChar('#');
         assertThat(MaskUtils.mask("ABCD", '*', 2, 3)).isEqualTo("####");
     }
+
+    @Test
+    @DisplayName("mask with an explicit config ignores the global one")
+    void maskWithExplicitConfig() {
+        MaskingConfig custom = MaskingConfig.create().setDefaultMaskChar('#');
+        assertEquals("####-####-####-1111", MaskUtils.mask("4111111111111111", MaskType.CREDIT_CARD, custom));
+        assertEquals("4111111111111111", MaskUtils.mask("4111111111111111", MaskType.CREDIT_CARD,
+                MaskingConfig.create().setEnabled(false)));
+    }
+
+    record Payment(@MaskData(MaskType.CREDIT_CARD) String card,
+                   @MaskData(MaskType.EMAIL) java.util.List<String> emails,
+                   @MaskData(MaskType.TOTAL) java.util.Map<String, String> secrets,
+                   java.math.BigDecimal amount) {
+        @Override
+        public String toString() {
+            return MaskUtils.toMaskedString(this);
+        }
+    }
+
+    static class Account {
+        @MaskData(MaskType.IBAN)
+        private final String iban = "ES6621000418401234567891";
+        private final String alias = "main";
+        private static final String IGNORED = "static fields are skipped";
+    }
+
+    static class SavingsAccount extends Account {
+        @MaskData(MaskType.PSEUDONYM)
+        private final String customerId = "CUS-1";
+    }
+
+    @Test
+    @DisplayName("toMaskedString masks annotated record components, containers included")
+    void toMaskedStringRecord() {
+        Payment payment = new Payment("4111111111111111", java.util.List.of("john.doe@mail.com"),
+                new java.util.LinkedHashMap<>(java.util.Map.of("apiKey", "s3cr3t")), new java.math.BigDecimal("10.00"));
+
+        assertEquals("Payment[card=****-****-****-1111, emails=[jo****@mail.com], secrets={apiKey=********}, amount=10.00]",
+                payment.toString());
+    }
+
+    @Test
+    @DisplayName("toMaskedString walks superclass fields first and skips statics")
+    void toMaskedStringClassHierarchy() {
+        assertEquals("SavingsAccount[iban=ES******************7891, alias=main, customerId=********]",
+                MaskUtils.toMaskedString(new SavingsAccount()));
+    }
+
+    @Test
+    @DisplayName("toMaskedString prints original values when masking is disabled, and null")
+    void toMaskedStringDisabledAndNull() {
+        MaskingConfig.getInstance().setEnabled(false);
+        assertEquals("Payment[card=4111111111111111, emails=[a@b.co], secrets=null, amount=null]",
+                MaskUtils.toMaskedString(new Payment("4111111111111111", java.util.List.of("a@b.co"), null, null)));
+        assertEquals("null", MaskUtils.toMaskedString(null));
+    }
 }
 

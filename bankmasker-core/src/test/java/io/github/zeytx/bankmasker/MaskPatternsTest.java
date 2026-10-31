@@ -96,4 +96,56 @@ class MaskPatternsTest {
     void luhnInvalid(String digits) {
         assertThat(MaskPatterns.passesLuhn(digits)).isFalse();
     }
+
+    @ParameterizedTest
+    @DisplayName("detects assignable SSNs in the dashed format")
+    @ValueSource(strings = {"123-45-6789", "001-01-0001", "899-99-9999"})
+    void ssnValid(String value) {
+        assertThat(MaskPatterns.isSsn(value)).isTrue();
+    }
+
+    @ParameterizedTest
+    @DisplayName("rejects unassignable or undashed SSNs")
+    @ValueSource(strings = {"000-12-3456", "666-12-3456", "900-12-3456", "123-00-6789", "123-45-0000",
+            "123456789", "123-456-789"})
+    void ssnInvalid(String value) {
+        assertThat(MaskPatterns.isSsn(value)).isFalse();
+    }
+
+    @ParameterizedTest
+    @DisplayName("detects international and separated local phone numbers")
+    @ValueSource(strings = {"+525512345678", "+52 55 1234 5678", "+1 (555) 123-4567", "(555) 123-4567",
+            "555-123-4567", "+34 912 345 678"})
+    void phoneValid(String value) {
+        assertThat(MaskPatterns.isPhone(value)).isTrue();
+    }
+
+    @ParameterizedTest
+    @DisplayName("bare digit runs, dates, SSNs and IPs are not phone numbers")
+    @ValueSource(strings = {"5551234567", "2024-10-30", "123-45-6789", "192.168.1.100", "+123", "+1234567890123456"})
+    void phoneInvalid(String value) {
+        assertThat(MaskPatterns.isPhone(value)).isFalse();
+    }
+
+    @ParameterizedTest
+    @DisplayName("detects national IDs with a valid check digit")
+    @ValueSource(strings = {
+            "12345678Z", "12345678-Z",            // Spain DNI
+            "X1234567L", "X-1234567-L",           // Spain NIE
+            "529.982.247-25",                     // Brazil CPF
+            "12.345.678-5",                       // Chile RUT
+            "20-12345678-6",                      // Argentina CUIT/CUIL
+            "GOMA850512HDFRRN07"                  // Mexico CURP
+    })
+    void nationalIdValid(String value) {
+        assertThat(MaskPatterns.isNationalId(value)).isTrue();
+    }
+
+    @ParameterizedTest
+    @DisplayName("rejects national IDs with a wrong check digit or format")
+    @ValueSource(strings = {"12345678A", "X1234567A", "529.982.247-26", "111.111.111-11", "12.345.678-K",
+            "20-12345678-5", "GOMA850512HDFRRN08", "GOMA851312HDFRRN07", "12345678", "529982247-25"})
+    void nationalIdInvalid(String value) {
+        assertThat(MaskPatterns.isNationalId(value)).isFalse();
+    }
 }

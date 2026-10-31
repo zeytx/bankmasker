@@ -78,6 +78,11 @@ final class MaskingSupport {
         return new MaskingSupport(resolveStrategy(type, annotation), keyStrategy, type, fieldName);
     }
 
+    /** Masking setup for a property matched by a {@link MaskingConfig#maskField} rule. */
+    static MaskingSupport of(MaskType type, String fieldName) {
+        return new MaskingSupport(type.getStrategy(), null, type, fieldName);
+    }
+
     /** Returns the per-mapper config stored as {@code attribute}, or the global one. */
     static MaskingConfig configOrGlobal(Object attribute) {
         return attribute instanceof MaskingConfig perMapper ? perMapper : MaskingConfig.getInstance();

@@ -3,7 +3,13 @@ package io.github.zeytx.bankmasker;
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.SerializationConfig;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+
+import java.util.List;
 
 /**
  * Jackson 2 module that allows per-{@link ObjectMapper} masking configuration.
@@ -66,6 +72,31 @@ public class MaskingModule extends Module {
         if (owner instanceof ObjectMapper mapper) {
             mapper.setDefaultAttributes(mapper.getSerializationConfig().getAttributes()
                     .withSharedAttribute(MaskingSupport.CONFIG_KEY, config));
+        }
+        context.addBeanSerializerModifier(new FieldMaskModifier(config));
+    }
+
+    /** Applies {@link MaskingConfig#maskField} rules to properties without {@link MaskData}. */
+    private static final class FieldMaskModifier extends BeanSerializerModifier {
+
+        private final MaskingConfig config;
+
+        FieldMaskModifier(MaskingConfig config) {
+            this.config = config;
+        }
+
+        @Override
+        public List<BeanPropertyWriter> changeProperties(SerializationConfig serializationConfig,
+                                                         BeanDescription beanDesc,
+                                                         List<BeanPropertyWriter> properties) {
+            for (BeanPropertyWriter property : properties) {
+                MaskType type = config.getFieldMask(property.getName());
+                // An explicit serializer (e.g. from @MaskData) takes precedence
+                if (type != null && !property.hasSerializer()) {
+                    property.assignSerializer(new MaskingSerializer(MaskingSupport.of(type, property.getName())));
+                }
+            }
+            return properties;
         }
     }
 

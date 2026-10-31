@@ -36,7 +36,7 @@ public class MaskingSerializer extends StdSerializer<Object> implements Contextu
         this(MaskingSupport.TOTAL);
     }
 
-    private MaskingSerializer(MaskingSupport support) {
+    MaskingSerializer(MaskingSupport support) {
         super(Object.class);
         this.support = support;
     }

@@ -150,6 +150,19 @@ class Jackson3MaskingSerializerTest {
     class ModuleTests {
 
         @Test
+        @DisplayName("maskField rules mask unannotated properties; @MaskData takes precedence")
+        void fieldRules() throws Exception {
+            JsonMapper custom = JsonMapper.builder()
+                    .addModule(new Jackson3MaskingModule(LoginRequest.rules()))
+                    .build();
+            ObjectMapper jackson2WithRules = new ObjectMapper().registerModule(new MaskingModule(LoginRequest.rules()));
+
+            assertEquals(jackson2.readTree(jackson2WithRules.writeValueAsString(new LoginRequest())),
+                    jackson2.readTree(custom.writeValueAsString(new LoginRequest())));
+            assertFalse(custom.writeValueAsString(new LoginRequest()).contains("hunter2"));
+        }
+
+        @Test
         @DisplayName("per-mapper config overrides the global one")
         void perMapperConfig() {
             JsonMapper custom = JsonMapper.builder()
