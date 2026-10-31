@@ -20,7 +20,7 @@ Works with Jackson 2 (`com.fasterxml.jackson`, Spring Boot 3) and Jackson 3 (`to
 
 ## Available MaskType values
 
-- `CREDIT_CARD`, `EMAIL`, `PHONE`, `DNI`, `IBAN`, `SSN`, `NAME`, `PASSPORT`, `BANK_ACCOUNT`, `IP_ADDRESS`, `AUTO`, `TOTAL`, `CUSTOM`
+- `CREDIT_CARD`, `EMAIL`, `PHONE`, `DNI`, `IBAN`, `SSN`, `NAME`, `PASSPORT`, `BANK_ACCOUNT`, `IP_ADDRESS`, `AUTO`, `TOTAL`, `CUSTOM`, `CREDIT_CARD_BIN`, `BIRTH_DATE`, `PSEUDONYM`
 
 ## Key imports
 

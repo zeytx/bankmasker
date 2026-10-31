@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-30
+
+### Added
+- **Secrets in logs** (`bankmasker-logging`): detectors for PEM private keys, magnetic stripe track data, passwords in URLs and connection strings, JWTs (header kept), `Bearer`/`Basic`/`Digest`/`Negotiate` credentials, 40+ provider API keys with a recognizable prefix (AWS, GitHub, GitLab, Slack, Stripe, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, PyPI, Vault…, after the gitleaks rules) and values of sensitive keys (`password`, `token`, `secret`, `apiKey`, `authorization`, `cookie`, `sessionId`, `cvv`, `pin`…) in `key=value`, `key: value`, JSON (also escaped JSON-in-JSON), query strings and XML
+- **National IDs** with check-digit validation (Spanish DNI/NIE, Brazilian CPF, Chilean RUT, Argentine CUIT/CUIL, Mexican CURP) in logs (`NATIONAL_ID` detector) and `MaskType.AUTO`; opt-in `PHONE` and `IP_ADDRESS` (IPv4/IPv6) log detectors
+- **Configurable `LogMasker`**: `LogMasker.builder()` (enable/disable detectors, extra sensitive keys, explicit `MaskingConfig`) and converter options `%maskedMsg{+PHONE,-EMAIL}`, `%maskedEx{short,+PHONE}`
+- **JSON logs**: Spring Boot 3.4+ structured logging (`MaskingJsonMembersCustomizer`), logstash-logback-encoder 9+ (`MaskingValueMasker`) and Log4j2 JSON layouts (`MaskingRewritePolicy`)
+- `MaskType.CREDIT_CARD_BIN` (BIN + last 4, the PCI DSS 3.4.1 display maximum), `BIRTH_DATE` (year only) and `PSEUDONYM` (keyed HMAC-SHA256: correlate events without exposing values, as the OWASP Logging Cheat Sheet recommends for session ids)
+- **Mask by property name** without annotations: `MaskingConfig.maskField(...)` / `bankmasker.fields.*`, applied by both Jackson modules; the starter registers the modules as beans so Spring Boot's JSON mapper picks them up
+- `MaskUtils.toMaskedString(Object)` for the `toString()` of records and DTOs (their generated `toString()` printed `@MaskData` fields in clear text), and `MaskUtils.mask(value, type, config)`
+- `MaskType.AUTO` detects SSNs, national IDs and phone numbers; `IP_ADDRESS` masks IPv6
+- `MaskPatterns.isSsn`, `isPhone` and `isNationalId`
+- Starter: `bankmasker.pseudonym-key`, `bankmasker.fields`, and a `WARN` when HTTP responses use Gson or JSON-B, which ignore `@MaskData`
+
+### Changed
+- `LogMasker` gathers cheap traits of each message in one pass and skips every detector that cannot match: a message with nothing sensitive is ~7x faster than in 1.2.0 despite 3x more detectors
+- With a pseudonym key configured, session ids found by `KEY_VALUE` become their `PSEUDONYM` instead of `********`, so a session's requests can be correlated
+- The SSN log detector only masks assignable SSNs (not area 000/666/9xx, group 00 or serial 0000)
+- Jackson 2 and Jackson 3 versions are managed through their BOMs
+
+### Security
+- `MaskingConfig.setDefaultMaskChar` rejects `"` and `\`: masked text is spliced into JSON and quoted values in logs
+
+### Fixed
+- Spring Boot starter: the auto-configuration was skipped on classpaths without Jackson 2 (Spring Boot 4 with Jackson 3 only), so every `bankmasker.*` property was ignored; it now only requires `MaskingConfig`
+
 ## [1.2.0] — 2026-10-06
 
 ### Added

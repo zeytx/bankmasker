@@ -13,10 +13,11 @@
 
 - **Zero configuration** — just annotate your fields with `@MaskData`
 - **Jackson 2 and Jackson 3** — the same annotation works with `com.fasterxml.jackson` and `tools.jackson` (Spring Boot 3 and 4)
-- **13 built-in mask types** — credit cards, emails, phones, IBANs, SSNs, names, passports, bank accounts, IPs, auto-detection, and more
+- **16 built-in mask types** — credit cards (last 4, or PCI-maximum BIN + last 4), emails, phones, IBANs, SSNs, names, passports, bank accounts, IPv4/IPv6, birth dates, keyed pseudonyms, auto-detection, and more
+- **Mask by field name** — `bankmasker.fields.password=TOTAL` also covers DTOs you cannot annotate
 - **Custom masking** — configurable mask character, visible start/end
-- **`MaskUtils`** — use masking in `toString()`, logs, or anywhere
-- **Log masking** — Logback/Log4j2 converters that scrub PANs, emails, IBANs and SSNs from log messages and stack traces
+- **`MaskUtils`** — use masking anywhere, and `toMaskedString()` for the `toString()` of records and DTOs
+- **Log masking** — 14 detectors for secrets (private keys, JWTs, 40+ provider API keys, Bearer/Basic credentials, passwords in URLs and in `key=value`/JSON/XML) and personal data (cards, track data, IBANs, SSNs, national IDs, emails, phones, IPs) in messages, stack traces and JSON logs (Spring Boot structured logging, logstash-logback-encoder, Log4j2)
 - **Fail-closed** — short values, unknown formats and arbitrary objects are fully masked, never partially leaked
 - **Java records support** — works with records, classes, and methods
 - **Spring Boot Starter** — auto-configuration via `application.yml`
@@ -44,14 +45,14 @@
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 
 <!-- Spring Boot (includes core automatically) -->
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -59,10 +60,10 @@
 
 ```groovy
 // Core only (any Java project)
-implementation 'io.github.zeytx:bankmasker-core:1.2.0'
+implementation 'io.github.zeytx:bankmasker-core:1.3.0'
 
 // Spring Boot (includes core automatically)
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.2.0'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.3.0'
 ```
 
 ### Annotate your DTO fields
@@ -164,6 +165,17 @@ String masked = MaskUtils.mask("ABCDEFGHIJK", '#', 2, 3);
 log.info("Processing payment for card {}", MaskUtils.mask(card, MaskType.CREDIT_CARD));
 ```
 
+Records' generated `toString()` and Lombok's `@ToString` print `@MaskData` fields **in clear text**, so a logged DTO leaks them. `toMaskedString()` builds the same representation with those fields masked:
+
+```java
+public record Payment(@MaskData(MaskType.CREDIT_CARD) String card, BigDecimal amount) {
+    @Override
+    public String toString() {
+        return MaskUtils.toMaskedString(this);   // Payment[card=****-****-****-1111, amount=10.00]
+    }
+}
+```
+
 ## 🌱 Spring Boot Configuration
 
 Add the starter and configure via `application.yml`:
@@ -172,12 +184,16 @@ Add the starter and configure via `application.yml`:
 bankmasker:
   enabled: true                # globally enable/disable masking
   default-mask-char: '*'       # default mask character
+  pseudonym-key: ${BANKMASKER_PSEUDONYM_KEY}   # secret for PSEUDONYM (>= 16 chars)
+  fields:                      # mask properties by name, no annotation needed
+    password: TOTAL
+    cardNumber: CREDIT_CARD    # also matches card_number
   audit:
     enabled: true              # enable SLF4J audit logging
     level: INFO                # audit log level (TRACE/DEBUG/INFO/WARN/ERROR)
 ```
 
-The starter auto-configures `MaskingConfig` and optionally enables SLF4J-based audit logging. It backs off if you declare your own `MaskingConfig` bean, logs a `WARN` at startup when masking is disabled, and fails fast on an invalid mask character (control characters or surrogates).
+The starter auto-configures `MaskingConfig`, optionally enables SLF4J-based audit logging, and registers `MaskingModule` / `Jackson3MaskingModule` beans that Spring Boot adds to its JSON mapper, so `bankmasker.fields` rules apply to every response. It works with Jackson 2, Jackson 3 or both on the classpath, backs off if you declare your own `MaskingConfig` or module bean, logs a `WARN` at startup when masking is disabled or HTTP responses use Gson/JSON-B (which ignore `@MaskData`), and fails fast on an invalid mask character or a short pseudonym key.
 
 ## ⚙️ Global Configuration (without Spring)
 
@@ -217,10 +233,17 @@ MaskingConfig.getInstance()
 | `NAME`         | `John Doe`                     | `J*** D**`                     |
 | `PASSPORT`     | `AB1234567`                    | `AB****567`                    |
 | `BANK_ACCOUNT` | `12345678901234`               | `**********1234`               |
-| `IP_ADDRESS`   | `192.168.1.100`                | `***.***.***.100`               |
-| `AUTO`         | *(card / email / IBAN)*        | *(matching mask, else total)*  |
+| `IP_ADDRESS`   | `192.168.1.100` / `2001:db8::8a2e:7334` | `***.***.***.100` / `****:****::****:7334` |
+| `AUTO`         | *(card / email / IBAN / SSN / national ID / phone)* | *(matching mask, else total)* |
 | `TOTAL`        | `anything`                     | `********`                     |
 | `CUSTOM`       | *(configurable)*               | *(configurable)*               |
+| `CREDIT_CARD_BIN` | `4111111111111111`          | `411111******1111`             |
+| `BIRTH_DATE`   | `1990-05-12`                   | `1990-**-**`                   |
+| `PSEUDONYM`    | `CUS-123456`                   | `5f1c0a7be2d94c38` *(keyed HMAC, 16 hex)* |
+
+- `CREDIT_CARD_BIN` shows the BIN and last 4 digits, the most PCI DSS (req. 3.4.1) allows to display; use it only where that much is justified (support, fraud) and `CREDIT_CARD` otherwise.
+- `PSEUDONYM` replaces a value with a stable HMAC-SHA256 pseudonym, so events can be correlated (a session or customer id across log lines) without exposing it, as the OWASP Logging Cheat Sheet recommends. It needs `MaskingConfig.setPseudonymKey(...)` / `bankmasker.pseudonym-key`; without a key values are fully masked.
+- `AUTO` only recognizes SSNs and phone numbers with their usual separators and national IDs with a valid check digit; bare digit runs stay fully masked.
 
 Types that keep the last characters visible **fail closed**: if the visible part would be as large as the hidden one, the value is fully masked (e.g. `CREDIT_CARD` on `12345` → `****`).
 
@@ -279,7 +302,24 @@ public record PaymentRecord(
 
 ## 🪵 Log Masking
 
-The optional `bankmasker-logging` module scrubs sensitive patterns (Luhn-validated card numbers, emails, IBANs — contiguous or printed in groups of 4 — and SSNs) from free-text log messages.
+The optional `bankmasker-logging` module finds and masks sensitive data in free-text log messages, stack traces and JSON logs. Detection favors precision so ordinary log content survives: card numbers must pass Luhn, national IDs their check digit, API keys need a provider prefix. Every pattern runs in linear time, so hostile input cannot stall logging (ReDoS).
+
+| Detector | Masks | Example output |
+|---|---|---|
+| `PRIVATE_KEY` | PEM private keys | `-----BEGIN RSA PRIVATE KEY-----********-----END RSA PRIVATE KEY-----` |
+| `TRACK_DATA` | Card track 1/2 data (PCI sensitive authentication data) | `********` |
+| `URL_CREDENTIALS` | Passwords in URLs and connection strings | `jdbc:postgresql://admin:********@db/app` |
+| `JWT` | JSON Web Tokens (header kept) | `eyJhbGciOiJIUzI1NiJ9.********` |
+| `AUTH_HEADER` | `Bearer` / `Basic` / `Digest` / `Negotiate` credentials | `Authorization: Bearer ********` |
+| `API_KEY` | 40+ provider keys (AWS, GitHub, GitLab, Slack, Stripe, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, PyPI, Vault…), prefix kept | `ghp_********`, `sk_live_********` |
+| `KEY_VALUE` | Values of `password`, `token`, `secret`, `apiKey`, `authorization`, `cookie`, `sessionId`, `cvv`, `pin`… in `k=v`, `k: v`, JSON, query strings and XML | `{"password":"********"}` |
+| `IBAN` | IBANs, contiguous or in groups of 4 | `ES******************7891` |
+| `PAN` | Luhn-valid card numbers | `****-****-****-1111` |
+| `SSN` | US SSNs in assignable ranges | `***-**-6789` |
+| `NATIONAL_ID` | Spanish DNI/NIE, Brazilian CPF, Chilean RUT, Argentine CUIT/CUIL, Mexican CURP (check digit validated) | `*****678Z` |
+| `EMAIL` | Email addresses | `jo****@mail.com` |
+| `PHONE` *(opt-in)* | International numbers (`+…`) | `********5678` |
+| `IP_ADDRESS` *(opt-in)* | IPv4 and IPv6 addresses | `***.***.***.100` |
 
 **Logback** (`logback.xml`):
 
@@ -296,11 +336,46 @@ The optional `bankmasker-logging` module scrubs sensitive patterns (Luhn-validat
 
 > ⚠️ Always add `%maskedEx`: if the pattern has no throwable converter, Logback and Log4j2 append the stack trace **unmasked**, and exception messages often carry the same data (`Invalid card 4111…`).
 
+Toggle detectors with converter options: `%maskedMsg{+PHONE, -EMAIL}` in Logback, `%maskedMsg{+PHONE,-EMAIL}` in Log4j2, and `%maskedEx{short, +PHONE}` alongside the usual `%ex` options.
+
+**JSON logs**, where `%maskedMsg` does not apply:
+
+- **Spring Boot 3.4+ structured logging** (ECS, Logstash, GELF): masks every string value (message, MDC, stack trace).
+
+  ```yaml
+  logging.structured.json.customizer: io.github.zeytx.bankmasker.logging.spring.MaskingJsonMembersCustomizer
+  ```
+
+- **logstash-logback-encoder 9+**:
+
+  ```xml
+  <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+    <decorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+      <valueMasker class="io.github.zeytx.bankmasker.logging.logback.MaskingValueMasker"/>
+    </decorator>
+  </encoder>
+  ```
+
+- **Log4j2 JSON layouts**: a rewrite appender masks the message and MDC before any layout.
+
+  ```xml
+  <Rewrite name="Masked">
+    <MaskingRewritePolicy detectors="+PHONE"/>   <!-- detectors is optional -->
+    <AppenderRef ref="Json"/>
+  </Rewrite>
+  ```
+
 Or programmatically for any other sink:
 
 ```java
 String safe = LogMasker.maskMessage("charge card 4111111111111111 approved");
 // → "charge card ****-****-****-1111 approved"
+
+LogMasker masker = LogMasker.builder()
+    .enable(LogMasker.Detector.PHONE)
+    .sensitiveKeys("membershipCode")      // extra keys for KEY_VALUE
+    .config(MaskingConfig.create().setDefaultMaskChar('#'))
+    .build();
 ```
 
 ## 🔌 Extensibility
@@ -329,10 +404,14 @@ Reference results (JDK 25, AMD Ryzen 7 5800XT, 1 fork, 5 × 2 s iterations; high
 | Same DTO, 10 fields masked — Jackson 3 | 649 ops/ms | 1.54 µs |
 | Single `CREDIT_CARD` field | 4,866 ops/ms | 0.21 µs |
 | `AUTO` detection | 822 ops/ms | 1.22 µs |
-| `LogMasker` — clean message (no match) | 341 ops/ms | 2.9 µs |
-| `LogMasker` — PAN in message | 289 ops/ms | 3.5 µs |
-| `LogMasker` — PAN + email + IBAN | 194 ops/ms | 5.2 µs |
-| `LogMasker` — 10 KB token without `@` | 3.5 ops/ms | 0.29 ms |
+| `LogMasker` — clean message (no match, all 12 default detectors) | 2,448 ops/ms | 0.41 µs |
+| `LogMasker` — PAN in message | 309 ops/ms | 3.2 µs |
+| `LogMasker` — PAN + email + IBAN | 117 ops/ms | 8.5 µs |
+| `LogMasker` — JSON body with password, card and PIN | 105 ops/ms | 9.5 µs |
+| `LogMasker` — Bearer token + JWT + AWS key | 74 ops/ms | 13.5 µs |
+| `LogMasker` — 10 KB token without `@` | 6.2 ops/ms | 0.16 ms |
+
+`LogMasker` checks cheap traits of each message (digit count, long tokens, `=`, `@`…) in one pass and skips every detector that cannot match, so the common case — a log line with nothing sensitive — costs well under a microsecond.
 
 ## 🧪 Running Tests
 
@@ -368,8 +447,11 @@ bankmasker/
 │       ├── LogMasker.java
 │       ├── logback/MaskingMessageConverter.java
 │       ├── logback/MaskingThrowableProxyConverter.java
+│       ├── logback/MaskingValueMasker.java       ← logstash-logback-encoder 9+
 │       ├── log4j2/MaskingMessagePatternConverter.java
-│       └── log4j2/MaskingThrowablePatternConverter.java
+│       ├── log4j2/MaskingThrowablePatternConverter.java
+│       ├── log4j2/MaskingRewritePolicy.java      ← Log4j2 JSON layouts
+│       └── spring/MaskingJsonMembersCustomizer.java ← Spring Boot structured logging
 ├── bankmasker-spring-boot-starter/      ← Spring Boot auto-config
 │   ├── pom.xml
 │   └── src/main/java/.../spring/

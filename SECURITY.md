@@ -32,7 +32,12 @@ sensitive value than documented** is treated as a security issue, for example:
   clear text in memory, in your database and in any `toString()` you write.
 - `bankmasker.enabled=false` / `MaskingConfig.setEnabled(false)` disables
   masking globally; never ship it to production.
-- Log masking is pattern-based (Luhn-validated PANs, emails, IBANs, SSNs). It
-  does not detect arbitrary secrets; use `%maskedMsg` **and** `%maskedEx`, or
-  stack traces are written unmasked.
+- Log masking is pattern-based: it finds the formats listed in the README
+  (secrets with a provider prefix or a sensitive key such as `password=`,
+  Luhn-valid cards, check-digit valid IDs...), not arbitrary secrets logged
+  without context. Use `%maskedMsg` **and** `%maskedEx`, or stack traces are
+  written unmasked; for JSON logs use the Spring Boot, logstash or Log4j2
+  integrations.
+- Generated `toString()` methods (records, Lombok) print `@MaskData` fields in
+  clear text; use `MaskUtils.toMaskedString(this)`.
 - Map keys are written as is unless `@MaskData(keyMask = …)` is set.
