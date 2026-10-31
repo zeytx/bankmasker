@@ -45,14 +45,14 @@
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
 </dependency>
 
 <!-- Spring Boot (includes core automatically) -->
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
 </dependency>
 ```
 
@@ -60,10 +60,10 @@
 
 ```groovy
 // Core only (any Java project)
-implementation 'io.github.zeytx:bankmasker-core:1.3.0'
+implementation 'io.github.zeytx:bankmasker-core:1.3.1'
 
 // Spring Boot (includes core automatically)
-implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.3.0'
+implementation 'io.github.zeytx:bankmasker-spring-boot-starter:1.3.1'
 ```
 
 ### Annotate your DTO fields
