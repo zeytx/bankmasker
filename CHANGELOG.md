@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.3.0] — 2026-10-30
+## [1.3.1] — 2026-10-30
+
+First release on Maven Central of the 1.3.0 changes below: the `v1.3.0` tag exists, but its release failed and 1.3.0 was never published.
+
+### Fixed
+- Release: Central rejected the bundle ("Bundle has content that does NOT have a .pom file") because Maven 3.10 writes local-repository files (`maven-metadata-local.xml`, `_remote.repositories`, `.locks`) into the staging directory; `central-publishing-maven-plugin` 0.12.0 removes them
+
+### Changed
+- Built against Jackson 2.22.4 and 3.2.4 (both `provided`)
+
+## [1.3.0] — 2026-10-30 (tagged, not published)
 
 ### Added
 - **Secrets in logs** (`bankmasker-logging`): detectors for PEM private keys, magnetic stripe track data, passwords in URLs and connection strings, JWTs (header kept), `Bearer`/`Basic`/`Digest`/`Negotiate` credentials, 40+ provider API keys with a recognizable prefix (AWS, GitHub, GitLab, Slack, Stripe, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, PyPI, Vault…, after the gitleaks rules) and values of sensitive keys (`password`, `token`, `secret`, `apiKey`, `authorization`, `cookie`, `sessionId`, `cvv`, `pin`…) in `key=value`, `key: value`, JSON (also escaped JSON-in-JSON), query strings and XML
