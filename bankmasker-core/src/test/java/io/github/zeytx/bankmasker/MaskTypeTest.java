@@ -230,6 +230,100 @@ class MaskTypeTest {
     }
 
     @ParameterizedTest
+    @DisplayName("AUTO also detects SSNs, national IDs and phone numbers")
+    @CsvSource({
+            "123-45-6789, ***-**-6789",
+            "12345678Z, *****678Z",
+            "529.982.247-25, **********7-25",
+            "'+52 55 1234 5678', ********5678",
+            "'(555) 123-4567', ******4567",
+            "5551234567, ********",
+            "000-12-3456, ********",
+            "12345678A, ********"
+    })
+    void autoExtendedFormats(String input, String expected) {
+        assertEquals(expected, MaskType.AUTO.getStrategy().mask(input));
+    }
+
+    @ParameterizedTest
+    @DisplayName("IP_ADDRESS masks IPv6 groups but the last one")
+    @CsvSource({
+            "2001:db8::8a2e:7334, ****:****::****:7334",
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334, ****:****:****:****:****:****:****:7334",
+            "::ffff:192.168.1.100, ***.***.***.100",
+            "fe80::1, ****::1"
+    })
+    void ipv6(String input, String expected) {
+        assertEquals(expected, MaskType.IP_ADDRESS.getStrategy().mask(input));
+    }
+
+    @ParameterizedTest
+    @DisplayName("CREDIT_CARD_BIN keeps the BIN and last 4 digits")
+    @CsvSource({
+            "4111111111111111, 411111******1111",
+            "'4111 1111 1111 1111', 411111******1111",
+            "378282246310005, 378282*****0005",
+            "4111111111111, 411111***1111",
+            "411111111111, ****"
+    })
+    void creditCardBin(String input, String expected) {
+        assertEquals(expected, MaskType.CREDIT_CARD_BIN.getStrategy().mask(input));
+    }
+
+    @ParameterizedTest
+    @DisplayName("BIRTH_DATE keeps only the year")
+    @CsvSource({
+            "1990-05-12, 1990-**-**",
+            "12/05/1990, **/**/1990",
+            "'May 12, 1990', '*** **, 1990'",
+            "1990-05-12T10:15:30, 1990-**-**T**:**:**",
+            "19900512, ********",
+            "unknown, ********"
+    })
+    void birthDate(String input, String expected) {
+        assertEquals(expected, MaskType.BIRTH_DATE.getStrategy().mask(input));
+    }
+
+    @Test
+    @DisplayName("PSEUDONYM is fully masked without a key")
+    void pseudonymWithoutKey() {
+        assertEquals("********", MaskType.PSEUDONYM.getStrategy().mask("CUS-123456"));
+    }
+
+    @Test
+    @DisplayName("PSEUDONYM is a stable, key-dependent HMAC")
+    void pseudonymWithKey() {
+        MaskingConfig a = MaskingConfig.create().setPseudonymKey("0123456789abcdef".getBytes());
+        MaskingConfig b = MaskingConfig.create().setPseudonymKey("fedcba9876543210".getBytes());
+        String first = MaskType.PSEUDONYM.getStrategy().mask("CUS-123456", a);
+
+        assertTrue(first.matches("[0-9a-f]{16}"), first);
+        assertEquals(first, MaskType.PSEUDONYM.getStrategy().mask("CUS-123456", a));
+        assertNotEquals(first, MaskType.PSEUDONYM.getStrategy().mask("CUS-123457", a));
+        assertNotEquals(first, MaskType.PSEUDONYM.getStrategy().mask("CUS-123456", b));
+    }
+
+    @Test
+    @DisplayName("pseudonym key must have at least 128 bits and is copied")
+    void pseudonymKeyValidation() {
+        assertThrows(IllegalArgumentException.class,
+                () -> MaskingConfig.create().setPseudonymKey("too-short".getBytes()));
+
+        byte[] key = "0123456789abcdef".getBytes();
+        MaskingConfig config = MaskingConfig.create().setPseudonymKey(key);
+        String before = MaskType.PSEUDONYM.getStrategy().mask("v", config);
+        key[0] = 'X';
+        assertEquals(before, MaskType.PSEUDONYM.getStrategy().mask("v", config));
+    }
+
+    @ParameterizedTest
+    @DisplayName("defaultMaskChar rejects quotes and backslashes")
+    @CsvSource({"34", "92"})
+    void rejectsDelimiterMaskChar(int codeUnit) {
+        assertThrows(IllegalArgumentException.class, () -> MaskingConfig.create().setDefaultMaskChar((char) codeUnit));
+    }
+
+    @ParameterizedTest
     @DisplayName("defaultMaskChar rejects control characters and surrogates")
     @CsvSource({"10", "13", "0", "55357"})
     void rejectsUnsafeMaskChar(int codeUnit) {

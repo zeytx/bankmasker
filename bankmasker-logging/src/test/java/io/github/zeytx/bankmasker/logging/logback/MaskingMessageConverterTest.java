@@ -49,4 +49,31 @@ class MaskingMessageConverterTest {
         String out = converter.convert(event("server started on port 8080"));
         assertThat(out).isEqualTo("server started on port 8080");
     }
+
+    private static MaskingMessageConverter started(LoggerContext context, String... options) {
+        MaskingMessageConverter configured = new MaskingMessageConverter();
+        configured.setContext(context);
+        configured.setOptionList(java.util.List.of(options));
+        configured.start();
+        return configured;
+    }
+
+    @Test
+    @DisplayName("options toggle detectors: %maskedMsg{+PHONE, -EMAIL}")
+    void options() {
+        MaskingMessageConverter configured = started(new LoggerContext(), "+PHONE", "-EMAIL");
+        assertThat(configured.convert(event("call +52 55 1234 5678 or john.doe@mail.com")))
+                .isEqualTo("call ********5678 or john.doe@mail.com");
+    }
+
+    @Test
+    @DisplayName("an invalid option is reported and the default detectors are kept")
+    void invalidOption() {
+        LoggerContext context = new LoggerContext();
+        MaskingMessageConverter configured = started(context, "PHONE");
+
+        assertThat(configured.convert(event("card 4111111111111111"))).isEqualTo("card ****-****-****-1111");
+        assertThat(context.getStatusManager().getCopyOfStatusList())
+                .anyMatch(status -> status.getMessage().contains("Invalid BankMasker option 'PHONE'"));
+    }
 }

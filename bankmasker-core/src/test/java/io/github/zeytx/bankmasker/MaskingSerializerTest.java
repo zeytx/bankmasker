@@ -175,6 +175,22 @@ class MaskingSerializerTest {
         public java.util.Map<String, String> values = java.util.Map.of("a", "b");
     }
 
+    /** Third-party style DTO: masked only through maskField rules, except the annotated pin. */
+    static class LoginRequest {
+        public String username = "alice";
+        public String password = "hunter2";
+        public String cardNumber = "4111111111111111";
+        @MaskData(MaskType.TOTAL)
+        public String pin = "1234";
+
+        static MaskingConfig rules() {
+            return MaskingConfig.create()
+                    .maskField("password", MaskType.TOTAL)
+                    .maskField("card_number", MaskType.CREDIT_CARD)
+                    .maskField("PIN", MaskType.CREDIT_CARD);
+        }
+    }
+
     /** POJO whose toString() mixes several sensitive fields. */
     record Holder(String name, String email, String ssn) {
         @Override
@@ -847,6 +863,23 @@ class MaskingSerializerTest {
     @Nested
     @DisplayName("MaskingModule — per-ObjectMapper config")
     class MaskingModuleTests {
+
+        @Test
+        @DisplayName("maskField rules mask unannotated properties; @MaskData takes precedence")
+        void fieldRules() throws JsonProcessingException {
+            ObjectMapper custom = new ObjectMapper().registerModule(new MaskingModule(LoginRequest.rules()));
+
+            assertEquals("{\"username\":\"alice\",\"password\":\"********\","
+                            + "\"cardNumber\":\"****-****-****-1111\",\"pin\":\"********\"}",
+                    custom.writeValueAsString(new LoginRequest()));
+        }
+
+        @Test
+        @DisplayName("maskField rules need the module")
+        void fieldRulesNeedModule() throws JsonProcessingException {
+            LoginRequest.rules();
+            assertTrue(mapper.writeValueAsString(new LoginRequest()).contains("\"password\":\"hunter2\""));
+        }
 
         @Test
         @DisplayName("keeps default attributes already set on the mapper")

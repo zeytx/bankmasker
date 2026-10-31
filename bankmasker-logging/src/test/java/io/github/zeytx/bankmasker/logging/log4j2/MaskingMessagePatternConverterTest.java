@@ -55,4 +55,28 @@ class MaskingMessagePatternConverterTest {
         assertThat(format("server started on port 8080"))
                 .isEqualTo("server started on port 8080");
     }
+
+    @Test
+    @DisplayName("options toggle detectors: %maskedMsg{+PHONE,-EMAIL}")
+    void options() {
+        MaskingMessagePatternConverter configured =
+                MaskingMessagePatternConverter.newInstance(new String[]{"+PHONE,-EMAIL"});
+        LogEvent event = Log4jLogEvent.newBuilder()
+                .setMessage(new SimpleMessage("call +52 55 1234 5678 or john.doe@mail.com"))
+                .build();
+        StringBuilder sb = new StringBuilder();
+        configured.format(event, sb);
+
+        assertThat(sb.toString()).isEqualTo("call ********5678 or john.doe@mail.com");
+    }
+
+    @Test
+    @DisplayName("an invalid option falls back to the default detectors")
+    void invalidOption() {
+        MaskingMessagePatternConverter configured = MaskingMessagePatternConverter.newInstance(new String[]{"+FOO"});
+        StringBuilder sb = new StringBuilder();
+        configured.format(Log4jLogEvent.newBuilder().setMessage(new SimpleMessage("card 4111111111111111")).build(), sb);
+
+        assertThat(sb.toString()).isEqualTo("card ****-****-****-1111");
+    }
 }

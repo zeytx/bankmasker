@@ -28,7 +28,7 @@ public class Jackson3MaskingSerializer extends StdSerializer<Object> {
         this(MaskingSupport.TOTAL);
     }
 
-    private Jackson3MaskingSerializer(MaskingSupport support) {
+    Jackson3MaskingSerializer(MaskingSupport support) {
         super(Object.class);
         this.support = support;
     }

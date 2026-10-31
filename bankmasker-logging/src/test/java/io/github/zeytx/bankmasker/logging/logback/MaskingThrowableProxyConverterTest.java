@@ -59,6 +59,21 @@ class MaskingThrowableProxyConverterTest {
     }
 
     @Test
+    @DisplayName("detector options are split from Logback's own options")
+    void detectorOptions() {
+        MaskingThrowableProxyConverter converter = new MaskingThrowableProxyConverter();
+        converter.setContext(context);
+        converter.setOptionList(java.util.List.of("short", "+PHONE"));
+        converter.start();
+
+        String out = converter.convert(event(new IllegalStateException("call +52 55 1234 5678")));
+
+        assertThat(out).contains("call ********5678").doesNotContain("1234 5678");
+        // "short" reached Logback: only the first stack frame is printed
+        assertThat(out.lines().filter(line -> line.trim().startsWith("at ")).count()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("layout using %maskedEx does not append an unmasked stack trace")
     void layoutHasNoUnmaskedTrace() {
         PatternLayout layout = new PatternLayout();

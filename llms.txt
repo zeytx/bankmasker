@@ -18,13 +18,13 @@ Add dependency (Maven):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-core</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
 Add dependency (Gradle):
 ```groovy
-implementation 'io.github.zeytx:bankmasker-core:1.2.0'
+implementation 'io.github.zeytx:bankmasker-core:1.3.0'
 ```
 
 Spring Boot (includes core):
@@ -32,7 +32,7 @@ Spring Boot (includes core):
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-spring-boot-starter</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -126,6 +126,16 @@ public String toString() {
 
 // Use in logs
 log.info("Card: {}", MaskUtils.mask(card, MaskType.CREDIT_CARD));
+
+// With an explicit config instead of the global one
+MaskUtils.mask(value, MaskType.EMAIL, MaskingConfig.create().setDefaultMaskChar('#'));
+
+// toString() of a record/DTO with its @MaskData fields masked
+// (generated toString() and Lombok @ToString print them in clear text)
+@Override
+public String toString() {
+    return MaskUtils.toMaskedString(this);   // Payment[card=****-****-****-1111, amount=10.00]
+}
 ```
 
 ### MaskingConfig — global configuration
@@ -135,10 +145,15 @@ import io.github.zeytx.bankmasker.MaskingConfig;
 
 MaskingConfig.getInstance()
     .setEnabled(true)           // enable/disable globally
-    .setDefaultMaskChar('#')    // change mask character for all types
+    .setDefaultMaskChar('#')    // change mask character for all types (not '"' or '\\')
+    .setPseudonymKey(secretBytes) // key for MaskType.PSEUDONYM (>= 16 bytes)
+    .maskField("password", MaskType.TOTAL) // mask a property by name, no annotation
     .setAuditLogger((field, type) ->
         log.info("Masked '{}' with {}", field, type));
 ```
+
+maskField rules are applied by MaskingModule / Jackson3MaskingModule, which must be
+registered on the mapper (the Spring Boot starter registers them as beans).
 
 ### MaskingModule — per-ObjectMapper configuration
 
@@ -175,6 +190,9 @@ application.yml:
 bankmasker:
   enabled: true
   default-mask-char: '*'
+  pseudonym-key: ${BANKMASKER_PSEUDONYM_KEY}   # for PSEUDONYM, >= 16 chars
+  fields:                                      # mask properties by name
+    password: TOTAL
   audit:
     enabled: true
     level: INFO        # TRACE/DEBUG/INFO/WARN/ERROR
@@ -182,14 +200,20 @@ bankmasker:
 
 ### Log masking (bankmasker-logging module)
 
-Scrubs Luhn-validated card numbers, emails, IBANs (contiguous or in groups of 4)
-and SSNs from free-text log messages.
+Masks secrets and personal data in log messages, stack traces and JSON logs.
+Detectors (in order): PRIVATE_KEY, TRACK_DATA, URL_CREDENTIALS, JWT, AUTH_HEADER
+(Bearer/Basic/Digest/Negotiate), API_KEY (40+ provider prefixes: AWS AKIA, ghp_,
+glpat-, xoxb-, sk_live_, AIza, sk-proj-, sk-ant-, SG., npm_, hvs....), KEY_VALUE
+(password/token/secret/apiKey/authorization/cookie/sessionId/cvv/pin... in k=v,
+k: v, JSON, query strings, XML), IBAN, PAN (Luhn), SSN, NATIONAL_ID (ES DNI/NIE,
+BR CPF, CL RUT, AR CUIT/CUIL, MX CURP, check digit validated), EMAIL, and opt-in
+PHONE and IP_ADDRESS. All patterns run in linear time.
 
 ```xml
 <dependency>
     <groupId>io.github.zeytx</groupId>
     <artifactId>bankmasker-logging</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -206,12 +230,28 @@ Log4j2 — use %maskedMsg (or %mm) and %maskedEx (or %mex) in the pattern layout
 
 Always include %maskedEx: without a throwable converter, Logback/Log4j2 append the stack trace unmasked.
 
+Toggle detectors with options: %maskedMsg{+PHONE, -EMAIL} (Logback), %maskedMsg{+PHONE,-EMAIL}
+(Log4j2), %maskedEx{short, +PHONE}.
+
+JSON logs:
+- Spring Boot 3.4+ structured logging:
+  logging.structured.json.customizer=io.github.zeytx.bankmasker.logging.spring.MaskingJsonMembersCustomizer
+- logstash-logback-encoder 9+: <decorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+  <valueMasker class="io.github.zeytx.bankmasker.logging.logback.MaskingValueMasker"/></decorator>
+- Log4j2 JSON layouts: <Rewrite name="Masked"><MaskingRewritePolicy/><AppenderRef ref="Json"/></Rewrite>
+
 Programmatic:
 ```java
 import io.github.zeytx.bankmasker.logging.LogMasker;
 
 String safe = LogMasker.maskMessage("charge card 4111111111111111 approved");
 // → "charge card ****-****-****-1111 approved"
+
+LogMasker masker = LogMasker.builder()
+    .enable(LogMasker.Detector.PHONE)
+    .sensitiveKeys("membershipCode")
+    .build();
+String out = masker.mask(message);
 ```
 
 ### Custom strategy
@@ -233,15 +273,18 @@ MaskingStrategy myStrategy = value -> value.charAt(0) + "***";
 - `NAME` — keeps first letter of each word
 - `PASSPORT` — keeps first 2 + last 3 characters
 - `BANK_ACCOUNT` — keeps last 4 digits
-- `IP_ADDRESS` — keeps last octet
-- `AUTO` — detects card (Luhn) / email / IBAN and applies the matching mask; total mask otherwise
+- `IP_ADDRESS` — keeps last octet (IPv4) or last group (IPv6)
+- `AUTO` — detects card (Luhn) / email / IBAN / SSN / national ID / phone and applies the matching mask; total mask otherwise
 - `TOTAL` — masks everything (default)
 - `CUSTOM` — configurable via maskChar, visibleStart, visibleEnd
+- `CREDIT_CARD_BIN` — keeps BIN (first 6) + last 4 (PCI DSS display maximum)
+- `BIRTH_DATE` — keeps only the year: 1990-05-12 → 1990-**-**
+- `PSEUDONYM` — stable keyed HMAC-SHA256 (16 hex chars); needs MaskingConfig.setPseudonymKey, otherwise total mask
 
 ## Key classes
 
 - `io.github.zeytx.bankmasker.MaskData` — annotation
-- `io.github.zeytx.bankmasker.MaskType` — enum with 13 built-in types
+- `io.github.zeytx.bankmasker.MaskType` — enum with 16 built-in types
 - `io.github.zeytx.bankmasker.MaskUtils` — programmatic masking utility
 - `io.github.zeytx.bankmasker.MaskingConfig` — global/per-mapper configuration
 - `io.github.zeytx.bankmasker.MaskingModule` — Jackson module for per-ObjectMapper config
@@ -249,8 +292,11 @@ MaskingStrategy myStrategy = value -> value.charAt(0) + "***";
 - `io.github.zeytx.bankmasker.MaskingSerializer` — Jackson serializer (internal)
 - `io.github.zeytx.bankmasker.MaskingAuditLogger` — audit interface
 - `io.github.zeytx.bankmasker.Slf4jMaskingAuditLogger` — SLF4J audit implementation (configurable level)
-- `io.github.zeytx.bankmasker.MaskPatterns` — detection helpers (isCreditCard/isEmail/isIban/passesLuhn)
+- `io.github.zeytx.bankmasker.MaskPatterns` — detection helpers (isCreditCard/isEmail/isIban/isSsn/isPhone/isNationalId/passesLuhn)
 - `io.github.zeytx.bankmasker.logging.LogMasker` — free-text log masking (bankmasker-logging)
+- `io.github.zeytx.bankmasker.logging.spring.MaskingJsonMembersCustomizer` — Spring Boot structured logging
+- `io.github.zeytx.bankmasker.logging.logback.MaskingValueMasker` — logstash-logback-encoder 9+
+- `io.github.zeytx.bankmasker.logging.log4j2.MaskingRewritePolicy` — Log4j2 JSON layouts
 
 ## Requirements
 
