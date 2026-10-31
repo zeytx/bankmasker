@@ -14,6 +14,23 @@ Please include the affected version, a minimal reproduction and the impact
 Fixes are released as patch versions and credited in the advisory unless you
 prefer otherwise.
 
+## Verifying a release
+
+Releases are built and published by GitHub Actions from a `vX.Y.Z` tag, never
+from a developer machine. From 1.4.0:
+
+- **Build provenance**: the jars carry a Sigstore attestation proving they were
+  built by this repository's release workflow:
+
+  ```bash
+  gh attestation verify bankmasker-core-1.4.0.jar --repo zeytx/bankmasker
+  ```
+
+- **SBOM**: a CycloneDX SBOM per module is published to Maven Central next to
+  the jars (`bankmasker-core-<version>-cyclonedx.json`) and attached to the
+  GitHub release.
+- **Signatures**: every artifact on Maven Central has a PGP signature (`.asc`).
+
 ## What counts as a vulnerability
 
 BankMasker is a defense-in-depth tool, so anything that **exposes more of a

@@ -12,13 +12,13 @@ Thank you for considering contributing to BankMasker! 🎉
    ```
 3. **Build** the project:
    ```bash
-   mvn clean verify
+   ./mvnw clean verify
    ```
 
 ## Development Setup
 
 - **Java 17+** is required
-- **Maven 3.8+** for building
+- **No Maven install needed**: `./mvnw` (`mvnw.cmd` on Windows) downloads the Maven version pinned in `.mvn/wrapper/maven-wrapper.properties`, the same one CI and releases use
 - IDE: IntelliJ IDEA recommended (import as Maven project)
 
 ## Branch Naming
@@ -34,7 +34,7 @@ Thank you for considering contributing to BankMasker! 🎉
 1. Create a branch from `main`
 2. Write your code following the existing style
 3. Add **tests** for any new functionality
-4. Make sure all tests pass: `mvn clean verify`
+4. Make sure all tests pass: `./mvnw clean verify`
 5. Update `CHANGELOG.md` under `[Unreleased]`
 
 ## Code Style
