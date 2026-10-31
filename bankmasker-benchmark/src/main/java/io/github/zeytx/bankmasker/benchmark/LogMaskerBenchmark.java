@@ -63,6 +63,23 @@ public class LogMaskerBenchmark {
         return LogMasker.maskMessage(LONG_TOKEN_MESSAGE);
     }
 
+    private static final String SECRETS_MESSAGE = "POST /oauth Authorization: Bearer abc123XYZ.def-456 "
+            + "id_token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U "
+            + "aws=AKIAIOSFODNN7EXAMPLE";
+
+    private static final String JSON_BODY_MESSAGE = "request body {\"user\":\"alice\",\"password\":\"hunter2\","
+            + "\"cardNumber\":\"4111111111111111\",\"pin\":\"1234\",\"amount\":125.50}";
+
+    @Benchmark
+    public String secretsMessage() {
+        return LogMasker.maskMessage(SECRETS_MESSAGE);
+    }
+
+    @Benchmark
+    public String jsonBodyMessage() {
+        return LogMasker.maskMessage(JSON_BODY_MESSAGE);
+    }
+
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
                 .include(LogMaskerBenchmark.class.getSimpleName())

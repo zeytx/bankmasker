@@ -61,6 +61,7 @@
         <logback.version>1.6.5</logback.version>
         <log4j.version>2.26.1</log4j.version>
         <spring-boot.version>3.5.16</spring-boot.version>
+        <logstash.version>9.0</logstash.version>
         <jmh.version>1.37</jmh.version>
 
         <!-- Plugin versions -->
@@ -85,18 +86,22 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- Jackson -->
+            <!-- Jackson 2 and Jackson 3 (tools.jackson), both optional for users.
+                 BOMs keep core/databind/annotations aligned across modules;
+                 the Jackson 2 BOM comes first so it picks jackson-annotations -->
             <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
                 <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
-
-            <!-- Jackson 3 (tools.jackson): optional, like Jackson 2 -->
             <dependency>
-                <groupId>tools.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
+                <groupId>tools.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
                 <version>${jackson3.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- Logging -->
@@ -123,7 +128,18 @@
                 <version>1.0.1</version>
             </dependency>
 
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash.version}</version>
+            </dependency>
+
             <!-- Spring Boot -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-autoconfigure</artifactId>

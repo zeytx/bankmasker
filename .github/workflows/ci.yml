@@ -61,6 +61,6 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Test the starter against Spring Boot 4
-        run: mvn -B clean verify -Pspring-boot-4 -pl bankmasker-spring-boot-starter -am
+      - name: Test the starter and logging integrations against Spring Boot 4
+        run: mvn -B clean verify -Pspring-boot-4 -pl bankmasker-spring-boot-starter,bankmasker-logging -am
 
