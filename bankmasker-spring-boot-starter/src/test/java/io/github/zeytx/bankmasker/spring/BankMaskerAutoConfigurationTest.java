@@ -144,4 +144,84 @@ class BankMaskerAutoConfigurationTest {
                             .isEqualTo(expected);
                 });
     }
+
+    static class LoginDto {
+        public String user = "alice";
+        public String password = "hunter2";
+        public String customerId = "CUS-1";
+    }
+
+    @Test
+    @DisplayName("bankmasker.fields rules apply through the Jackson 2 and Jackson 3 module beans")
+    void fieldRules() {
+        runner.withPropertyValues("bankmasker.fields.password=TOTAL", "bankmasker.fields.customer_id=PSEUDONYM")
+                .run(context -> {
+                    assertThat(MaskingConfig.getInstance().getFieldMask("password")).isEqualTo(MaskType.TOTAL);
+                    String jackson2 = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .registerModule(context.getBean(io.github.zeytx.bankmasker.MaskingModule.class))
+                            .writeValueAsString(new LoginDto());
+                    String jackson3 = tools.jackson.databind.json.JsonMapper.builder()
+                            .addModule(context.getBean(io.github.zeytx.bankmasker.Jackson3MaskingModule.class))
+                            .build().writeValueAsString(new LoginDto());
+
+                    for (String json : new String[]{jackson2, jackson3}) {
+                        assertThat(json).contains("\"user\":\"alice\"", "\"password\":\"********\"",
+                                "\"customerId\":\"********\"").doesNotContain("hunter2");
+                    }
+                });
+    }
+
+    @Test
+    @DisplayName("bankmasker.pseudonym-key enables PSEUDONYM; a short key fails fast")
+    void pseudonymKey() {
+        runner.withPropertyValues("bankmasker.pseudonym-key=0123456789abcdef")
+                .run(context -> assertThat(io.github.zeytx.bankmasker.MaskUtils.mask("CUS-1", MaskType.PSEUDONYM))
+                        .matches("[0-9a-f]{16}"));
+        runner.withPropertyValues("bankmasker.pseudonym-key=short")
+                .run(context -> assertThat(context).getFailure().rootCause()
+                        .hasMessageContaining("at least 16 bytes"));
+    }
+
+    @Test
+    @DisplayName("auto-configures with Jackson 3 only (Spring Boot 4 without Jackson 2)")
+    void jackson3Only() {
+        runner.withClassLoader(new org.springframework.boot.test.context.FilteredClassLoader("com.fasterxml.jackson"))
+                .withPropertyValues("bankmasker.enabled=false")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(MaskingConfig.class)
+                            .hasSingleBean(io.github.zeytx.bankmasker.Jackson3MaskingModule.class)
+                            .doesNotHaveBean(io.github.zeytx.bankmasker.MaskingModule.class);
+                    assertThat(MaskingConfig.getInstance().isEnabled()).isFalse();
+                });
+    }
+
+    @Test
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    @DisplayName("warns when HTTP responses use Gson or JSON-B")
+    void warnsOnNonJacksonMapper(org.springframework.boot.test.system.CapturedOutput output) {
+        runner.withPropertyValues("spring.http.converters.preferred-json-mapper=gson")
+                .run(context -> assertThat(output).contains("preferred-json-mapper=gson"));
+    }
+
+    @Test
+    @DisplayName("Spring Boot's own JSON mapper applies bankmasker.fields rules and @MaskData")
+    void springJsonMapper() throws ClassNotFoundException {
+        // Spring Boot 3: Jackson 2 ObjectMapper; Spring Boot 4: Jackson 3 JsonMapper (spring-boot-jackson)
+        String boot3 = "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration";
+        boolean isBoot3 = org.springframework.util.ClassUtils.isPresent(boot3, null);
+        Class<?> jacksonAutoConfiguration = Class.forName(isBoot3 ? boot3
+                : "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration");
+
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(BankMaskerAutoConfiguration.class, jacksonAutoConfiguration))
+                .withPropertyValues("bankmasker.fields.password=TOTAL")
+                .run(context -> {
+                    String json = isBoot3
+                            ? context.getBean(com.fasterxml.jackson.databind.ObjectMapper.class)
+                                    .writeValueAsString(new LoginDto())
+                            : context.getBean(tools.jackson.databind.json.JsonMapper.class)
+                                    .writeValueAsString(new LoginDto());
+                    assertThat(json).contains("\"password\":\"********\"").doesNotContain("hunter2");
+                });
+    }
 }
