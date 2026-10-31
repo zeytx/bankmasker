@@ -7,6 +7,8 @@
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x_|_4.x-green)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
 [![CI](https://github.com/zeytx/bankmasker/actions/workflows/ci.yml/badge.svg)](https://github.com/zeytx/bankmasker/actions)
+[![CodeQL](https://github.com/zeytx/bankmasker/actions/workflows/codeql.yml/badge.svg)](https://github.com/zeytx/bankmasker/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/zeytx/bankmasker/badge)](https://scorecard.dev/viewer/?uri=github.com/zeytx/bankmasker)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.zeytx/bankmasker-core)](https://central.sonatype.com/artifact/io.github.zeytx/bankmasker-core)
 
 ## ✨ Features
@@ -391,7 +393,7 @@ MaskingStrategy myStrategy = value -> value.charAt(0) + "***";
 Run JMH benchmarks to measure serialization overhead:
 
 ```bash
-mvn -pl bankmasker-benchmark -am package -DskipTests
+./mvnw -pl bankmasker-benchmark -am package -DskipTests
 java -jar bankmasker-benchmark/target/bankmasker-benchmark-*.jar
 ```
 
@@ -416,8 +418,10 @@ Reference results (JDK 25, AMD Ryzen 7 5800XT, 1 fork, 5 × 2 s iterations; high
 ## 🧪 Running Tests
 
 ```bash
-mvn clean verify
+./mvnw clean verify
 ```
+
+The Maven Wrapper downloads the pinned Maven version (SHA-256 verified), so no local Maven install is needed; on Windows use `mvnw.cmd`.
 
 Coverage report: `bankmasker-core/target/site/jacoco/index.html`
 
@@ -460,7 +464,11 @@ bankmasker/
 ├── bankmasker-benchmark/                ← JMH benchmarks
 │   └── src/main/java/.../benchmark/
 │       └── MaskingSerializerBenchmark.java
-├── .github/workflows/ci.yml            ← GitHub Actions CI
+├── .github/workflows/ci.yml            ← CI: tests (Java 17/21/25), Spring Boot 4, release bundle check
+├── .github/workflows/release.yml       ← Maven Central release, SBOM, provenance attestation
+├── .github/workflows/codeql.yml        ← CodeQL security analysis
+├── .github/workflows/scorecard.yml     ← OpenSSF Scorecard
+├── mvnw, mvnw.cmd, .mvn/wrapper/       ← Maven Wrapper (pinned Maven)
 ├── .github/copilot-instructions.md     ← GitHub Copilot context
 ├── docs/                                ← GitHub Pages site
 │   └── index.html

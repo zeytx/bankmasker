@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- CI builds the Maven Central bundle on every change, without signing or uploading it, and checks it against Central's layout rules (a `.pom` in every directory, sources and javadoc for every jar, no local-repository files): a bundle Central would reject now fails a pull request instead of a release
+- CodeQL analysis (`security-extended` queries) on every change and weekly; OpenSSF Scorecard on `main` with a README badge
+
+### Changed
+- The Maven Wrapper pins Maven 3.9.16 (SHA-256 verified) for CI, releases and contributors, so a runner upgrade can no longer change the build: the GitHub runner's move to Maven 3.10 is what broke the 1.3.0 release
+
+### Security
+- Releases publish a CycloneDX SBOM per module (Maven Central and GitHub release) and a Sigstore build provenance attestation for the jars, verifiable with `gh attestation verify <jar> --repo zeytx/bankmasker`
+
 ## [1.3.1] — 2026-10-30
 
 First release on Maven Central of the 1.3.0 changes below: the `v1.3.0` tag exists, but its release failed and 1.3.0 was never published.
